@@ -79,21 +79,18 @@ Só que o cache de áudio depende do texto repetir — e é aí que estava o fur
 
 ## Deploy na Vercel
 
-**Um projeto só**, servindo o site e a API no mesmo domínio. A *Root Directory* é a **raiz do repositório** (deixe o campo vazio nas Settings do projeto).
+São **dois projetos**, apontando para o mesmo repositório, cada um com sua *Root Directory*:
 
-Não é economia de projeto: no mesmo domínio o navegador nunca faz uma requisição cross-origin, então **CORS deixa de existir como problema**. O front chama `/api` relativo, o que também faz cada deploy de preview conversar com a própria API, sem variável nova.
+| Projeto | Root Directory | Config | Vira |
+|---|---|---|---|
+| API | `apps/api` | `apps/api/vercel.json` | https://4ls-api.vercel.app |
+| Site | `apps/web` | `apps/web/vercel.json` | o site |
 
-| Caminho | Quem responde |
-|---|---|
-| `/assets/…` | arquivos do build do Vite |
-| `/api/…` | a função serverless (Nest) |
-| qualquer outro | `index.html` — o React Router assume |
+Na tela de import da Vercel, o Root Directory é o campo que decide tudo: importar a raiz do repo não funciona aqui, e importar a pasta errada publica metade do sistema sem erro nenhum — a API sozinha responde bonito e o site nunca aparece.
 
-O sistema de arquivos é consultado antes dos rewrites, então os assets vencem; o resto cai nas regras do `vercel.json`, nessa ordem.
+### Variáveis (só no projeto da API)
 
-### O que precisa estar no painel
-
-Só as variáveis (Settings → Environment Variables). O `.env` é local e está fora do git:
+Settings → Environment Variables. O `.env` é local e está fora do git:
 
 ```
 DATABASE_URL           a URL com -pooler do Neon (com pgbouncer=true)
@@ -101,19 +98,28 @@ DIRECT_DATABASE_URL    a mesma, sem o -pooler
 JWT_SECRET             um segredo longo e aleatório
 ```
 
-`CORS_ORIGINS` **não é mais necessária** — mesma origem. Se você definir mesmo assim, ela passa a valer e restringe quem pode chamar a API de fora.
+**`CORS_ORIGINS` pode ficar em branco.** Vazia, a API libera `localhost` e qualquer `*.vercel.app` — o que já cobre o site. Definindo, ela passa a valer *exatamente*, e é o que você deve fazer quando o site tiver domínio próprio.
+
+Dois erros que essa variável já causou aqui e não dão nenhuma pista no log da API, porque quem bloqueia é o navegador:
+
+- apontar para a URL **da API** em vez da do site — o `Origin` que chega é sempre o do site, então nada casa;
+- colar **com aspas** do `.env.example`: no painel da Vercel o valor é literal, e `"https://site.com"` guarda as aspas dentro da string. O código normaliza aspas e barra final, mas evite.
 
 > Mudar variável na Vercel não aplica sozinho: precisa de um *Redeploy*.
+
+O site não precisa de variável: a URL da API está versionada em `apps/web/.env.production`. Definir `VITE_API_URL` no painel sobrescreve, útil para apontar um preview para outra API.
 
 As chaves de IA e de voz são opcionais. Sem elas o sistema sobe funcional — só sem tutor, sem exercícios gerados e com a voz do navegador.
 
 ### Como a API roda em serverless
 
-Numa função não existe processo escutando porta, então há dois pontos de entrada: `apps/api/src/main.ts` (local, `app.listen`) e `apps/api/src/serverless.ts` (Vercel, `app.init` + handler). Os dois aplicam a mesma configuração, que mora em `apps/api/src/bootstrap.ts` — prefixo, CORS, pipes e limite de corpo num lugar só, para os ambientes não divergirem.
+Numa função não existe processo escutando porta, então há dois pontos de entrada: `src/main.ts` (local, `app.listen`) e `src/serverless.ts` (Vercel, `app.init` + handler). Os dois aplicam a mesma configuração, que mora em `src/bootstrap.ts` — prefixo, CORS, pipes e limite de corpo num lugar só, para os ambientes não divergirem.
 
 A aplicação Nest fica **em cache no escopo do módulo**. Sem isso cada requisição reconstruiria o container e abriria conexão nova no banco, estourando o pool do Neon em poucos acessos simultâneos. Um cold start que falha limpa o cache, para a invocação seguinte poder tentar de novo.
 
-O `api/index.js` na raiz é JavaScript puro de propósito: o builder da Vercel compila a pasta `api/` com esbuild, que **não** emite `emitDecoratorMetadata` — e sem esses metadados a injeção de dependência do Nest quebra. O TypeScript é compilado antes pelo `nest build` (tsc, que emite) e a função só carrega o resultado.
+O `api/index.js` é JavaScript puro de propósito: o builder da Vercel compila a pasta `api/` com esbuild, que **não** emite `emitDecoratorMetadata` — e sem esses metadados a injeção de dependência do Nest quebra. O TypeScript é compilado antes pelo `nest build` (tsc, que emite) e a função só carrega o resultado.
+
+A raiz do domínio da API serve `public/index.html`, uma página estática. Ela existe porque a Vercel exige um diretório de saída quando há `buildCommand` próprio — já que era obrigatório, melhor mostrar algo útil que um erro.
 
 ### Armadilhas que o código já trata
 
