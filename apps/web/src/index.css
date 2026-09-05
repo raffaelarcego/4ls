@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-white font-sans text-eel antialiased;
+  }
+  /* Nada de texto selecionado por acidente ao clicar rapido nos botoes de resposta. */
+  button {
+    @apply select-none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border-2 border-swan bg-white p-5;
+  }
+
+  /*
+    Botao 3D: a "espessura" e uma sombra solida embaixo. Ao pressionar, o botao
+    desce ate encostar na sombra -- e o que da a sensacao fisica de tecla.
+  */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3
+           text-sm font-extrabold uppercase tracking-wider
+           transition-[transform,box-shadow,background-color] duration-75
+           disabled:pointer-events-none disabled:opacity-100;
+  }
+  .btn-primary {
+    @apply btn bg-grass text-white shadow-[0_4px_0_theme(colors.grass-dark)]
+           hover:brightness-105 active:translate-y-[4px] active:shadow-none
+           disabled:bg-swan disabled:text-hare disabled:shadow-none;
+  }
+  .btn-blue {
+    @apply btn bg-macaw text-white shadow-[0_4px_0_theme(colors.macaw-dark)]
+           hover:brightness-105 active:translate-y-[4px] active:shadow-none
+           disabled:bg-swan disabled:text-hare disabled:shadow-none;
+  }
+  .btn-danger {
+    @apply btn bg-cardinal text-white shadow-[0_4px_0_theme(colors.cardinal-dark)]
+           hover:brightness-105 active:translate-y-[4px] active:shadow-none;
+  }
+  .btn-ghost {
+    @apply btn border-2 border-b-[4px] border-swan bg-white text-wolf
+           hover:bg-snow active:translate-y-[2px] active:border-b-2;
+  }
+  /* Acao secundaria discreta, sem peso visual de botao. */
+  .btn-plain {
+    @apply btn bg-transparent px-3 text-hare shadow-none hover:text-wolf;
+  }
+
+  .input {
+    @apply w-full rounded-2xl border-2 border-swan bg-snow px-4 py-3 text-base font-semibold
+           text-eel placeholder:font-normal placeholder:text-hare
+           outline-none transition focus:border-macaw focus:bg-white;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-extrabold uppercase tracking-wider text-wolf;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide;
+  }
+  .section-title {
+    @apply text-xs font-extrabold uppercase tracking-widest text-hare;
+  }
+}

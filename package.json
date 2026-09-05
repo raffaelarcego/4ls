@@ -1,0 +1,22 @@
+{
+  "name": "raffael-4l",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run start:dev -w @4l/api",
+    "dev:web": "npm run dev -w @4l/web",
+    "db:migrate": "npm run db:migrate -w @4l/api",
+    "db:seed": "npm run db:seed -w @4l/api",
+    "db:studio": "npm run db:studio -w @4l/api",
+    "build": "npm run build -w @4l/api && npm run build -w @4l/web",
+    "test": "npm run test -w @4l/api",
+    "db:rewind": "npm run db:rewind -w @4l/api --"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

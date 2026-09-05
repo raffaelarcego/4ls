@@ -1,0 +1,413 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Runtime usa a conexao com pooler (PgBouncer) do Neon.
+  url = env("DATABASE_URL")
+  // Migrations precisam de uma conexao direta: o PgBouncer nao suporta
+  // os comandos de DDL em sessao que o Prisma Migrate emite.
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// =========================== Nucleo ===========================
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  dailyMinutes Int      @default(60)
+  timezone     String   @default("America/Sao_Paulo")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userLanguages    UserLanguage[]
+  userVocabulary   UserVocabulary[]
+  studySessions    StudySession[]
+  errors           ErrorRecord[]
+  assessments      Assessment[]
+  conversations    Conversation[]
+  userAchievements UserAchievement[]
+  streak           Streak?
+  aiCalls          AiCallLog[]
+
+  @@map("users")
+}
+
+model Language {
+  id   String @id @default(uuid())
+  code String @unique // en | es | de
+  name String
+  flag String @default("")
+
+  userLanguages UserLanguage[]
+  vocabulary    Vocabulary[]
+  lessons       Lesson[]
+  activities    Activity[]
+  errors        ErrorRecord[]
+  assessments   Assessment[]
+  conversations Conversation[]
+
+  @@map("languages")
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+model UserLanguage {
+  id            String    @id @default(uuid())
+  userId        String
+  languageId    String
+  currentLevel  CefrLevel @default(A1)
+  targetLevel   CefrLevel @default(B1)
+  priority      Int       @default(1)
+  minutesPerDay Int       @default(20)
+
+  // subcompetencias CEFR (0-100)
+  listening     Float @default(0)
+  reading       Float @default(0)
+  writing       Float @default(0)
+  speaking      Float @default(0)
+  vocabScore    Float @default(0)
+  grammar       Float @default(0)
+  pronunciation Float @default(0)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, languageId])
+  @@map("user_languages")
+}
+
+// =========================== Vocabulario + SRS ===========================
+
+model Vocabulary {
+  id          String    @id @default(uuid())
+  languageId  String
+  term        String
+  meaning     String
+  example     String?
+  translation String?
+  level       CefrLevel @default(A1)
+  difficulty  Int       @default(3) // 1-5
+  source      String    @default("seed")
+  createdAt   DateTime  @default(now())
+
+  language Language         @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  users    UserVocabulary[]
+
+  @@unique([languageId, term])
+  @@map("vocabulary")
+}
+
+enum VocabStatus {
+  NEW
+  LEARNING
+  REVIEW
+  MASTERED
+}
+
+model UserVocabulary {
+  id           String      @id @default(uuid())
+  userId       String
+  vocabularyId String
+  status       VocabStatus @default(NEW)
+  confidence   Float       @default(0) // 0-1
+  easeFactor   Float       @default(2.5)
+  intervalDays Int         @default(0)
+  repetitions  Int         @default(0)
+  lastReview   DateTime?
+  nextReview   DateTime    @default(now())
+  correctCount Int         @default(0)
+  wrongCount   Int         @default(0)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+  @@index([userId, nextReview])
+  @@map("user_vocabulary")
+}
+
+// =========================== Conteudo ===========================
+
+enum Pillar {
+  LISTEN
+  LEARN
+  LIVE
+  LEVEL_UP
+}
+
+model Lesson {
+  id         String    @id @default(uuid())
+  languageId String
+  title      String
+  level      CefrLevel @default(A1)
+  pillar     Pillar    @default(LEARN)
+  type       String // vocabulary | grammar | dialogue | listening | reading
+  content    Json
+  minutes    Int       @default(5)
+  createdAt  DateTime  @default(now())
+
+  language   Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@map("lessons")
+}
+
+// =========================== Sessoes de estudo ===========================
+
+model StudySession {
+  id              String    @id @default(uuid())
+  userId          String
+  date            DateTime  @default(now())
+  plannedMinutes  Int       @default(60)
+  durationSeconds Int       @default(0)
+  xpEarned        Int       @default(0)
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  plan            Json? // snapshot do Daily Mission Engine
+  rationale       String? // por que esta sessao
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@index([userId, date])
+  @@map("study_sessions")
+}
+
+model Activity {
+  id              String   @id @default(uuid())
+  sessionId       String
+  languageId      String
+  lessonId        String?
+  pillar          Pillar
+  type            String
+  order           Int      @default(0)
+  plannedMinutes  Int      @default(5)
+  durationSeconds Int      @default(0)
+  score           Float? // 0-100
+  xpEarned        Int      @default(0)
+  completed       Boolean  @default(false)
+  payload         Json?
+  reason          String? // por que foi recomendada
+  createdAt       DateTime @default(now())
+
+  session  StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  language Language     @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  lesson   Lesson?      @relation(fields: [lessonId], references: [id])
+
+  @@index([sessionId])
+  @@map("activities")
+}
+
+// =========================== Error Intelligence ===========================
+
+enum ErrorCategory {
+  VOCABULARY
+  GRAMMAR
+  PRONUNCIATION
+  WORD_ORDER
+  ARTICLE
+  TENSE
+  PREPOSITION
+  FALSE_COGNATE
+  SPELLING
+  COMPREHENSION
+}
+
+model ErrorRecord {
+  id              String        @id @default(uuid())
+  userId          String
+  languageId      String
+  category        ErrorCategory
+  description     String
+  userText        String?
+  correctedText   String?
+  explanation     String?
+  source          String        @default("tutor") // tutor | writing | speaking | review
+  severity        Int           @default(2) // 1-3
+  occurrenceCount Int           @default(1)
+  lastOccurrence  DateTime      @default(now())
+  resolved        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@index([userId, languageId, resolved])
+  @@map("errors")
+}
+
+// =========================== Avaliacao ===========================
+
+model Assessment {
+  id             String    @id @default(uuid())
+  userId         String
+  languageId     String
+  skill          String // listening | reading | writing | speaking | grammar | vocabulary
+  score          Float
+  estimatedLevel CefrLevel
+  detail         Json?
+  createdAt      DateTime  @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@map("assessments")
+}
+
+// =========================== Tutor ===========================
+
+model Conversation {
+  id         String    @id @default(uuid())
+  userId     String
+  languageId String
+  title      String    @default("Nova conversa")
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language Language  @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, languageId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String // user | assistant | system
+  content        String
+  correction     Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+// =========================== Gamificacao ===========================
+
+model Streak {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  current       Int       @default(0)
+  longest       Int       @default(0)
+  lastActiveDay DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("streaks")
+}
+
+model Achievement {
+  id          String @id @default(uuid())
+  code        String @unique
+  name        String
+  description String
+  xp          Int    @default(0)
+  icon        String @default("*")
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// =========================== Observabilidade de IA ===========================
+
+model AiCallLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  provider      String
+  model         String
+  task          String
+  language      String?
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  latencyMs     Int      @default(0)
+  success       Boolean  @default(true)
+  error         String?
+  estimatedCost Float    @default(0)
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("ai_call_logs")
+}
+
+// =========================== Fala ===========================
+
+/**
+ * Cache de audio sintetizado. A chave e o hash de (texto + idioma + voz), nao
+ * o id de um termo: a mesma frase dita no mesmo idioma custa uma unica
+ * sintetizacao para sempre, venha ela do flashcard, do listening ou do tutor.
+ */
+model SpeechClip {
+  id           String   @id @default(uuid())
+  hash         String   @unique
+  languageCode String
+  voice        String
+  text         String
+  mimeType     String   @default("audio/mpeg")
+  data         Bytes
+  bytes        Int      @default(0)
+  provider     String
+  model        String
+  playCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  lastPlayedAt DateTime @default(now())
+
+  @@index([languageCode])
+  @@map("speech_clips")
+}
+
+/**
+ * Dialogos de listening ja gerados.
+ *
+ * O cache de audio (speech_clips) so ajuda se o texto se repetir. Como cada
+ * bloco de escuta gerava um dialogo novo, o texto nunca repetia e a sintese
+ * era sempre paga -- justamente no conteudo mais caro. Guardando os dialogos
+ * num pool por idioma e nivel, o custo cai a zero depois que o pool enche: o
+ * texto vem daqui e o audio ja esta em cache.
+ */
+model ListeningDialogue {
+  id           String   @id @default(uuid())
+  languageCode String
+  level        String
+  title        String
+  context      String
+  lines        Json
+  questions    Json
+  vocabulary   Json?
+  timesUsed    Int      @default(0)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([languageCode, level])
+  @@map("listening_dialogues")
+}
