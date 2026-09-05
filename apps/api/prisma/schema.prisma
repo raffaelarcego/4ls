@@ -1,5 +1,9 @@
 generator client {
   provider = "prisma-client-js"
+  // "native" cobre a maquina de desenvolvimento; o segundo alvo e o runtime
+  // Linux da Vercel. Sem ele o deploy sobe sem o engine certo e toda query
+  // falha em producao, mesmo com o build passando.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

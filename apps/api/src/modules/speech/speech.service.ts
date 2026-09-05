@@ -1,8 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SpeechRouterService } from '../../infrastructure/speech/speech-router.service';
 
-/** Teto do audio aceito para transcricao: ~2 minutos de fala em webm/opus. */
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+/**
+ * Teto do audio aceito para transcricao.
+ *
+ * 3 MB de audio viram ~4 MB em base64, que e o limite do body parser e cabe
+ * abaixo do teto de 4.5 MB que a Vercel impoe a qualquer requisicao. Na
+ * pratica sobra folga: o gravador do front para sozinho em 90 segundos, o que
+ * da cerca de 1.5 MB em webm/opus.
+ */
+const MAX_AUDIO_BYTES = 3 * 1024 * 1024;
 
 @Injectable()
 export class SpeechService {
@@ -51,7 +58,7 @@ export class SpeechService {
       throw new BadRequestException('Audio vazio ou base64 invalido.');
     }
     if (audio.length > MAX_AUDIO_BYTES) {
-      throw new BadRequestException('Audio longo demais. Grave no maximo 2 minutos.');
+      throw new BadRequestException('Audio longo demais. Grave no maximo 90 segundos.');
     }
 
     const result = await this.speech.listen({

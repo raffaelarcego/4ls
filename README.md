@@ -77,6 +77,54 @@ Só que o cache de áudio depende do texto repetir — e é aí que estava o fur
 
 **Progresso → Cache de voz** mostra quantas frases estão guardadas, quantas reproduções já aconteceram e quantas sintetizações isso evitou.
 
+## Deploy na Vercel
+
+São **dois projetos** apontando para o mesmo repositório, cada um com sua *Root Directory*:
+
+| Projeto | Root Directory | Vira |
+|---|---|---|
+| API | `apps/api` | https://4ls-api.vercel.app |
+| Web | `apps/web` | o site |
+
+### O que precisa estar configurado no painel
+
+A API não sobe sem estas variáveis (Settings → Environment Variables). Elas vivem só lá — o `.env` é local e está fora do git:
+
+```
+DATABASE_URL           a URL com -pooler do Neon (com pgbouncer=true)
+DIRECT_DATABASE_URL    a mesma, sem o -pooler
+JWT_SECRET             qualquer segredo longo e aleatório
+CORS_ORIGINS           a URL exata do site, ex.: https://4ls-web.vercel.app
+```
+
+As de IA e de voz são opcionais, e valem as mesmas regras do resto do projeto: sem elas o sistema sobe funcional, só sem tutor, sem exercícios gerados e com a voz do navegador.
+
+`CORS_ORIGINS` merece atenção: **sem ela**, a API libera `localhost` e qualquer `*.vercel.app`, para um deploy novo não nascer quebrado. Isso é conveniência de bootstrap, não postura de produção — assim que o site tiver domínio, aponte a variável para ele.
+
+### Como a API roda em serverless
+
+Numa função não existe processo que escuta porta, então há dois pontos de entrada: `src/main.ts` (local, `app.listen`) e `src/serverless.ts` (Vercel, `app.init` + handler). Os dois aplicam a mesma configuração, que mora em `src/bootstrap.ts` — prefixo, CORS, pipes e limite de corpo ficam num lugar só justamente para os ambientes não divergirem.
+
+A aplicação Nest fica **em cache no escopo do módulo**. Sem isso cada requisição reconstruiria o container e abriria conexão nova no banco, estourando o pool do Neon em poucos acessos simultâneos.
+
+O `api/index.js` é JavaScript puro de propósito: o builder da Vercel compila a pasta `api/` com esbuild, que não emite `emitDecoratorMetadata` — e sem esses metadados a injeção de dependência do Nest quebra. O TypeScript é compilado antes pelo `nest build` (tsc, que emite), e a função só carrega o resultado.
+
+### Limites da plataforma que o código já respeita
+
+- **Corpo de 4.5 MB.** O áudio do Speaking Lab vai em base64, então o teto virou 3 MB de áudio (~4 MB codificado). O gravador do front para sozinho em 90 s, o que dá cerca de 1,5 MB — sobra folga.
+- **Duração da função.** `maxDuration` está em 60 s no `vercel.json`. Importa: uma avaliação de escrita ou de fala no modelo forte leva ~16 s, e o padrão de 10 s cortaria a chamada no meio.
+- **Engine do Prisma.** O `schema.prisma` declara `binaryTargets = ["native", "rhel-openssl-3.0.x"]`. Sem o segundo alvo o build passa e *toda query falha em produção*.
+
+### Migrations
+
+O deploy **não** roda migration — o build só faz `prisma generate && nest build`. Rodar `migrate deploy` no build deixaria um erro de banco derrubar o deploy inteiro, e builds concorrentes brigariam pela mesma trava.
+
+Depois de mudar o schema, aplique você mesmo antes de publicar:
+
+```bash
+npm run db:migrate
+```
+
 ## Arquitetura
 
 ```
@@ -166,6 +214,7 @@ GET  /api/speech/cache                   o que o cache já economizou
 GET  /api/errors | /api/errors/by-category
 GET  /api/analytics/time | consistency | weekly-review | ai-usage
 GET  /api/achievements
+GET  /api/health                         única rota sem autenticação: subiu? banco responde?
 ```
 
 ## Regra de ouro
