@@ -88,6 +88,8 @@ São **dois projetos**, apontando para o mesmo repositório, cada um com sua *Ro
 
 Na tela de import da Vercel, o Root Directory é o campo que decide tudo: importar a raiz do repo não funciona aqui, e importar a pasta errada publica metade do sistema sem erro nenhum — a API sozinha responde bonito e o site nunca aparece.
 
+Os dois `package.json` têm um script **`vercel-build`**. A Vercel procura por ele antes do `build`, e tê-lo deixa o deploy imune a um *Build Command* sobrescrito no painel apontando para esse nome — que foi exatamente o que quebrou o primeiro deploy do site (`Missing script: "vercel-build"`). Se o painel tiver um Build Command customizado que você não reconhece, o normal é deixá-lo em branco e confiar no `vercel.json`.
+
 ### Variáveis (só no projeto da API)
 
 Settings → Environment Variables. O `.env` é local e está fora do git:
