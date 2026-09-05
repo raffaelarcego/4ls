@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { ElevenLabsProvider } from './elevenlabs.provider';
+import { MimoSpeechProvider } from './mimo-speech.provider';
 import { OpenAiSpeechProvider } from './openai-speech.provider';
 import {
   MAX_TTS_CHARS,
@@ -46,12 +47,15 @@ export class SpeechRouterService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    mimo: MimoSpeechProvider,
     openai: OpenAiSpeechProvider,
     elevenlabs: ElevenLabsProvider,
   ) {
-    const byName: Record<string, SpeechProvider> = { openai, elevenlabs };
+    const byName: Record<string, SpeechProvider> = { mimo, openai, elevenlabs };
+    // MiMo primeiro: usa a chave que ja existe para texto, entao voz natural
+    // funciona sem configurar mais nada.
     this.chain = config
-      .get<string>('SPEECH_PROVIDER_ORDER', 'openai,elevenlabs')
+      .get<string>('SPEECH_PROVIDER_ORDER', 'mimo,openai,elevenlabs')
       .split(',')
       .map((s) => byName[s.trim().toLowerCase()])
       .filter((p): p is SpeechProvider => Boolean(p));

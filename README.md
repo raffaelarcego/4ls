@@ -55,17 +55,34 @@ Toda chamada — inclusive as que falham — é registrada em `ai_call_logs` e a
 
 ## Configurar a voz
 
-O sistema fala e ouve. Como na IA de texto, isso é uma **cadeia de providers com fallback** e, como no resto do projeto, **funciona sem nenhuma chave**.
+O sistema fala. E, se a chave da MiMo já está preenchida, **ele já fala com voz natural — sem configurar mais nada**, porque a mesma chave que atende o texto atende o áudio.
 
 ```env
-SPEECH_PROVIDER_ORDER="openai,elevenlabs"
-SPEECH_API_KEY=""        # rotas /audio/speech e /audio/transcriptions (compatível com OpenAI)
-ELEVENLABS_API_KEY=""    # só sintetiza, com timbre mais natural
+SPEECH_PROVIDER_ORDER="mimo,openai,elevenlabs"
 ```
 
-Sem chave nenhuma o front cai na `speechSynthesis` do próprio navegador para ouvir, e no reconhecimento de fala do navegador (Chrome/Edge) para falar. Funciona, é grátis e não depende de nada — só soa sintético. Preencher uma chave **troca a qualidade, não habilita a funcionalidade**.
+### MiMo
 
-Os dois providers não são intercambiáveis: o compatível com OpenAI faz as duas pontas (falar e transcrever); o ElevenLabs só fala. Por isso a transcrição exige `SPEECH_API_KEY` mesmo com o ElevenLabs configurado.
+A MiMo **não** expõe `/audio/speech` como a OpenAI. TTS e ASR passam pelo próprio `/chat/completions`, e o formato tem uma inversão que custa tempo descobrir: o texto a ser falado vai na mensagem **`assistant`**, e a mensagem **`user`** carrega a instrução de estilo em linguagem natural. Mandar o texto no `user` responde `messages must contain an assistant role for TTS model`.
+
+Vozes por idioma em `MIMO_VOICE_EN/ES/DE` (Mia, Chloe, Milo, Dean, além das chinesas). Timbres distintos ajudam a não confundir os três cursos.
+
+O áudio volta em **WAV**, sem opção comprimida — cerca de 150–180 KB por frase curta. Como cada frase é sintetizada uma única vez e fica em cache, o custo é de armazenamento, não de repetição; **Progresso → Cache de voz** mostra quanto já foi guardado.
+
+### O ASR da MiMo vem desligado
+
+`MIMO_ASR_LANGUAGES` é vazio por padrão. São dois motivos medidos, não suposição:
+
+- **Fora do inglês a transcrição sai corrompida.** Uma frase alemã limpa (`Guten Morgen! Wie geht es dir heute?`) voltou como `But, Margen, we get es今他` — inglês e chinês misturados. Em inglês a mesma prova saiu perfeita.
+- **O navegador grava em webm/opus**, que a MiMo não aceita.
+
+Alimentar o Speaking Lab com uma transcrição corrompida seria pior que não ter transcrição: o aluno receberia correção sobre um texto que nunca disse. Com a lista vazia, `/speech/status` responde `stt: false` e o front usa o reconhecimento do próprio navegador.
+
+Para transcrição de verdade nos três idiomas, configure `SPEECH_API_KEY` (Whisper ou compatível). Para habilitar a MiMo só em inglês e com áudio wav: `MIMO_ASR_LANGUAGES="en"`.
+
+### Sem chave nenhuma
+
+O front cai na `speechSynthesis` do navegador para ouvir, e no reconhecimento de fala do navegador (Chrome/Edge) para falar. Funciona, é grátis e não depende de nada — só soa sintético. Preencher uma chave **troca a qualidade, não habilita a funcionalidade**.
 
 ### O cache é o ponto todo
 
