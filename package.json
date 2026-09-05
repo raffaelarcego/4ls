@@ -14,7 +14,8 @@
     "db:studio": "npm run db:studio -w @4l/api",
     "build": "npm run build -w @4l/api && npm run build -w @4l/web",
     "test": "npm run test -w @4l/api",
-    "db:rewind": "npm run db:rewind -w @4l/api --"
+    "db:rewind": "npm run db:rewind -w @4l/api --",
+    "vercel-build": "npm run db:generate -w @4l/api && npm run build -w @4l/api && npm run build -w @4l/web"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

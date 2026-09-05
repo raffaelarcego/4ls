@@ -79,47 +79,52 @@ Só que o cache de áudio depende do texto repetir — e é aí que estava o fur
 
 ## Deploy na Vercel
 
-São **dois projetos** apontando para o mesmo repositório, cada um com sua *Root Directory*:
+**Um projeto só**, servindo o site e a API no mesmo domínio. A *Root Directory* é a **raiz do repositório** (deixe o campo vazio nas Settings do projeto).
 
-| Projeto | Root Directory | Vira |
-|---|---|---|
-| API | `apps/api` | https://4ls-api.vercel.app |
-| Web | `apps/web` | o site |
+Não é economia de projeto: no mesmo domínio o navegador nunca faz uma requisição cross-origin, então **CORS deixa de existir como problema**. O front chama `/api` relativo, o que também faz cada deploy de preview conversar com a própria API, sem variável nova.
 
-### O que precisa estar configurado no painel
+| Caminho | Quem responde |
+|---|---|
+| `/assets/…` | arquivos do build do Vite |
+| `/api/…` | a função serverless (Nest) |
+| qualquer outro | `index.html` — o React Router assume |
 
-A API não sobe sem estas variáveis (Settings → Environment Variables). Elas vivem só lá — o `.env` é local e está fora do git:
+O sistema de arquivos é consultado antes dos rewrites, então os assets vencem; o resto cai nas regras do `vercel.json`, nessa ordem.
+
+### O que precisa estar no painel
+
+Só as variáveis (Settings → Environment Variables). O `.env` é local e está fora do git:
 
 ```
 DATABASE_URL           a URL com -pooler do Neon (com pgbouncer=true)
 DIRECT_DATABASE_URL    a mesma, sem o -pooler
-JWT_SECRET             qualquer segredo longo e aleatório
-CORS_ORIGINS           a URL exata do site, ex.: https://4ls-web.vercel.app
+JWT_SECRET             um segredo longo e aleatório
 ```
 
-As de IA e de voz são opcionais, e valem as mesmas regras do resto do projeto: sem elas o sistema sobe funcional, só sem tutor, sem exercícios gerados e com a voz do navegador.
+`CORS_ORIGINS` **não é mais necessária** — mesma origem. Se você definir mesmo assim, ela passa a valer e restringe quem pode chamar a API de fora.
 
-`CORS_ORIGINS` merece atenção: **sem ela**, a API libera `localhost` e qualquer `*.vercel.app`, para um deploy novo não nascer quebrado. Isso é conveniência de bootstrap, não postura de produção — assim que o site tiver domínio, aponte a variável para ele.
+> Mudar variável na Vercel não aplica sozinho: precisa de um *Redeploy*.
+
+As chaves de IA e de voz são opcionais. Sem elas o sistema sobe funcional — só sem tutor, sem exercícios gerados e com a voz do navegador.
 
 ### Como a API roda em serverless
 
-Numa função não existe processo que escuta porta, então há dois pontos de entrada: `src/main.ts` (local, `app.listen`) e `src/serverless.ts` (Vercel, `app.init` + handler). Os dois aplicam a mesma configuração, que mora em `src/bootstrap.ts` — prefixo, CORS, pipes e limite de corpo ficam num lugar só justamente para os ambientes não divergirem.
+Numa função não existe processo escutando porta, então há dois pontos de entrada: `apps/api/src/main.ts` (local, `app.listen`) e `apps/api/src/serverless.ts` (Vercel, `app.init` + handler). Os dois aplicam a mesma configuração, que mora em `apps/api/src/bootstrap.ts` — prefixo, CORS, pipes e limite de corpo num lugar só, para os ambientes não divergirem.
 
-A aplicação Nest fica **em cache no escopo do módulo**. Sem isso cada requisição reconstruiria o container e abriria conexão nova no banco, estourando o pool do Neon em poucos acessos simultâneos.
+A aplicação Nest fica **em cache no escopo do módulo**. Sem isso cada requisição reconstruiria o container e abriria conexão nova no banco, estourando o pool do Neon em poucos acessos simultâneos. Um cold start que falha limpa o cache, para a invocação seguinte poder tentar de novo.
 
-O `api/index.js` é JavaScript puro de propósito: o builder da Vercel compila a pasta `api/` com esbuild, que não emite `emitDecoratorMetadata` — e sem esses metadados a injeção de dependência do Nest quebra. O TypeScript é compilado antes pelo `nest build` (tsc, que emite), e a função só carrega o resultado.
+O `api/index.js` na raiz é JavaScript puro de propósito: o builder da Vercel compila a pasta `api/` com esbuild, que **não** emite `emitDecoratorMetadata` — e sem esses metadados a injeção de dependência do Nest quebra. O TypeScript é compilado antes pelo `nest build` (tsc, que emite) e a função só carrega o resultado.
 
-### Limites da plataforma que o código já respeita
+### Armadilhas que o código já trata
 
-- **Corpo de 4.5 MB.** O áudio do Speaking Lab vai em base64, então o teto virou 3 MB de áudio (~4 MB codificado). O gravador do front para sozinho em 90 s, o que dá cerca de 1,5 MB — sobra folga.
-- **Duração da função.** `maxDuration` está em 60 s no `vercel.json`. Importa: uma avaliação de escrita ou de fala no modelo forte leva ~16 s, e o padrão de 10 s cortaria a chamada no meio.
-- **Engine do Prisma.** O `schema.prisma` declara `binaryTargets = ["native", "rhel-openssl-3.0.x"]`. Sem o segundo alvo o build passa e *toda query falha em produção*.
+- **Banco dormindo no cold start.** O Neon free hiberna quando ocioso. O `$connect()` na subida **não** derruba mais a aplicação: o Prisma reconecta na primeira query, e enquanto isso `/api/health` consegue dizer que o problema é o banco — antes, o init inteiro abortava e *todas* as rotas respondiam 500, inclusive as que nem tocam no banco.
+- **Engine do Prisma.** `binaryTargets = ["native", "rhel-openssl-3.0.x"]`. Sem o alvo Linux o build passa e *toda query falha em produção*.
+- **Corpo de 4.5 MB.** O áudio do Speaking Lab vai em base64, então o teto é 3 MB de áudio (~4 MB codificado). O gravador para sozinho em 90 s, o que dá ~1,5 MB.
+- **Duração da função.** `maxDuration: 60`. O padrão de 10 s cortaria no meio uma avaliação de fala ou escrita no modelo forte, que leva ~16 s.
 
 ### Migrations
 
-O deploy **não** roda migration — o build só faz `prisma generate && nest build`. Rodar `migrate deploy` no build deixaria um erro de banco derrubar o deploy inteiro, e builds concorrentes brigariam pela mesma trava.
-
-Depois de mudar o schema, aplique você mesmo antes de publicar:
+O deploy **não** roda migration — o build só gera o client e compila. Rodar `migrate deploy` no build deixaria um erro de banco derrubar o deploy inteiro, e builds concorrentes brigariam pela mesma trava. Depois de mudar o schema, aplique antes de publicar:
 
 ```bash
 npm run db:migrate

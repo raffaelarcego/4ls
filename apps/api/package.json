@@ -14,7 +14,8 @@
     "postinstall": "prisma generate",
     "db:rewind": "tsx prisma/rewind.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

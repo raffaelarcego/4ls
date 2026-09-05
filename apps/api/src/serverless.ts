@@ -48,6 +48,22 @@ function server(): Promise<Express> {
 }
 
 export default async function handler(req: Request, res: Response) {
-  const app = await server();
-  return app(req, res);
+  try {
+    const app = await server();
+    return app(req, res);
+  } catch (err) {
+    // Se a aplicacao nem subiu, a plataforma devolveria um
+    // FUNCTION_INVOCATION_FAILED sem nenhuma pista. Um 503 com a causa e a
+    // diferenca entre depurar em minutos e vasculhar log de build.
+    const message = (err as Error).message ?? 'erro desconhecido';
+    res.statusCode = 503;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(
+      JSON.stringify({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: `A API nao conseguiu inicializar: ${message}`,
+      }),
+    );
+  }
 }
