@@ -29,6 +29,42 @@ export function configureApp(app: INestApplication): void {
 }
 
 /**
+ * Origens declaradas em CORS_ORIGINS, ja normalizadas.
+ *
+ * As aspas sao removidas de proposito. Num arquivo .env o dotenv tira as
+ * aspas de `CORS_ORIGINS="https://site.com"`, mas no painel da Vercel o valor
+ * e literal: colar com aspas guardaria `"https://site.com"` com as aspas
+ * dentro da string, que nunca casa com nenhuma Origin e derruba o CORS inteiro
+ * sem dar nenhuma pista. A barra final tambem cai, porque o navegador nunca
+ * manda Origin com barra.
+ */
+export function configuredOrigins(): string[] {
+  return (process.env.CORS_ORIGINS ?? '').split(',').map(normalizeOrigin).filter(Boolean);
+}
+
+/**
+ * Tira aspas e barra final de uma origem, em qualquer ordem.
+ *
+ * O laco existe porque as duas sujeiras se escondem uma atras da outra: em
+ * `"https://site.com/"` a barra esta dentro das aspas, e em `"https://site.com"/`
+ * a aspa esta antes da barra. Uma passada so limpa um dos dois casos.
+ */
+function normalizeOrigin(raw: string): string {
+  let value = raw.trim();
+  let previous = '';
+
+  while (value !== previous) {
+    previous = value;
+    value = value
+      .replace(/^["']|["']$/g, '')
+      .replace(/\/+$/, '')
+      .trim();
+  }
+
+  return value;
+}
+
+/**
  * Quem pode chamar a API.
  *
  * Com `CORS_ORIGINS` definido, vale exatamente a lista -- e o que voce deve
@@ -41,10 +77,7 @@ export function configureApp(app: INestApplication): void {
  * de ler respostas no navegador -- nao substitui o JWT.
  */
 export function corsOrigin() {
-  const configured = (process.env.CORS_ORIGINS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const configured = configuredOrigins();
 
   if (configured.length > 0) return configured;
 
