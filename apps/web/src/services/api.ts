@@ -1,7 +1,26 @@
 import axios from 'axios';
 
+/**
+ * Base da API, tolerante ao que vier na variavel de ambiente.
+ *
+ * A API vive toda sob o prefixo `/api` (global prefix do Nest). Preencher
+ * `VITE_API_URL` sem esse sufixo -- que e o erro natural, ja que o campo pede
+ * "a URL da API" -- fazia todas as chamadas cairem um nivel acima e o app
+ * inteiro morrer com "Cannot POST /auth/register", sem nenhuma pista do
+ * motivo. Normalizar aqui custa tres linhas e elimina a classe de erro.
+ *
+ * Aceita: https://host/api, https://host/, https://host, /api
+ */
+function resolveBaseUrl(): string {
+  const raw = (import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api').trim();
+  const withoutTrailingSlash = raw.replace(/\/+$/, '');
+  return withoutTrailingSlash.endsWith('/api')
+    ? withoutTrailingSlash
+    : `${withoutTrailingSlash}/api`;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api',
+  baseURL: resolveBaseUrl(),
 });
 
 const TOKEN_KEY = '4l.token';
