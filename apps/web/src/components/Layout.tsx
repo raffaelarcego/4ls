@@ -4,11 +4,12 @@ import { NavLink } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
 import { DashboardData } from '../types';
-import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon } from './Icons';
+import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
 
 const NAV = [
   { to: '/', label: 'Aprender', Icon: HomeIcon, tone: 'text-macaw' },
   { to: '/vocabulario', label: 'Palavras', Icon: CardsIcon, tone: 'text-grass' },
+  { to: '/estruturas', label: 'Estruturas', Icon: PuzzleIcon, tone: 'text-cardinal' },
   { to: '/tutor', label: 'Tutor', Icon: ChatIcon, tone: 'text-humpback' },
   { to: '/progresso', label: 'Progresso', Icon: ChartIcon, tone: 'text-beak' },
 ];

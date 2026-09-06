@@ -7,6 +7,7 @@ export type AiTask =
   | 'tutor.chat'
   | 'tutor.correct'
   | 'exercise.generate'
+  | 'grammar.drill'
   | 'lesson.generate'
   | 'listening.generate'
   | 'dictation.generate'
@@ -28,6 +29,11 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // Um dialogo de listening vira audio e fica em cache: vale pagar o modelo
   // forte uma vez para nao gerar conteudo torto que sera ouvido muitas vezes.
   'listening.generate',
+  // Mesmo argumento, e mais forte: um exercicio de gramatica errado ensina a
+  // regra errada, fica no pool e e repetido por meses. O modelo rapido erra
+  // aqui de formas caras -- marca como errada uma frase correta, ou poe a
+  // lacuna fora do ponto que o topico ensina.
+  'grammar.drill',
 ]);
 
 export interface AiMessage {

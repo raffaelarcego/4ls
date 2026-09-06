@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // "native" cobre a maquina de desenvolvimento; o segundo alvo e o runtime
   // Linux da Vercel. Sem ele o deploy sobe sem o engine certo e toda query
   // falha em producao, mesmo com o build passando.
@@ -7,9 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Runtime usa a conexao com pooler (PgBouncer) do Neon.
-  url = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // Migrations precisam de uma conexao direta: o PgBouncer nao suporta
   // os comandos de DDL em sessao que o Prisma Migrate emite.
   directUrl = env("DIRECT_DATABASE_URL")
@@ -34,6 +34,7 @@ model User {
   assessments      Assessment[]
   conversations    Conversation[]
   userAchievements UserAchievement[]
+  grammarProgress  GrammarProgress[]
   streak           Streak?
   aiCalls          AiCallLog[]
 
@@ -392,7 +393,6 @@ model SpeechClip {
 
 /**
  * Dialogos de listening ja gerados.
- *
  * O cache de audio (speech_clips) so ajuda se o texto se repetir. Como cada
  * bloco de escuta gerava um dialogo novo, o texto nunca repetia e a sintese
  * era sempre paga -- justamente no conteudo mais caro. Guardando os dialogos
@@ -414,4 +414,61 @@ model ListeningDialogue {
 
   @@index([languageCode, level])
   @@map("listening_dialogues")
+}
+
+// =========================== Gramatica contrastiva ===========================
+
+/**
+ * Progresso do aluno em um contraste gramatical, por idioma ALVO.
+ * A chave e (usuario, topico, idioma): "ordem das palavras" estudada para o
+ * alemao e um progresso diferente de "ordem das palavras" para o ingles --
+ * sao regras distintas, ainda que o topico do catalogo seja o mesmo.
+ * O topico nao e uma FK: o catalogo vive no codigo (contrast-catalog.ts), nao
+ * no banco. Guardar o id como string evita ter de migrar o banco toda vez que
+ * um contraste novo e escrito.
+ */
+model GrammarProgress {
+  id            String   @id @default(uuid())
+  userId        String
+  topicId       String
+  languageCode  String
+  /**
+   * 0-100, media movel dos acertos: mede se o ponto firmou.
+   */
+  mastery       Float    @default(0)
+  attempts      Int      @default(0)
+  correct       Int      @default(0)
+  /**
+   * Marcado pelo aluno como "isso ainda me confunde".
+   */
+  flagged       Boolean  @default(false)
+  lastStudiedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId, languageCode])
+  @@index([userId, languageCode])
+  @@map("grammar_progress")
+}
+
+/**
+ * Exercicios de contraste ja gerados, guardados por (topico, idioma, nivel).
+ * Mesma logica do pool de dialogos de listening: gerar um conjunto novo a cada
+ * abertura de topico pagaria a IA para sempre. Com o pool, depois que ele
+ * enche o custo vai a zero e o aluno ainda ve variacao suficiente para nao
+ * decorar a ordem das respostas.
+ */
+model GrammarDrillSet {
+  id           String   @id @default(uuid())
+  topicId      String
+  languageCode String
+  level        String
+  drills       Json
+  timesUsed    Int      @default(0)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([topicId, languageCode, level])
+  @@map("grammar_drill_sets")
 }

@@ -269,3 +269,125 @@ Responda APENAS com JSON valido:
 }
 Cada score vai de 0 a 100. Liste no maximo 3 erros em topErrors, do mais grave ao menos grave.`;
 }
+
+// ---------------------------------------------------------------------------
+// Gramatica contrastiva
+// ---------------------------------------------------------------------------
+
+/**
+ * Contexto de um contraste, montado a partir do catalogo curado.
+ * O service preenche isto; a IA nunca decide quem se parece com quem.
+ */
+export interface ContrastContext {
+  title: string;
+  question: string;
+  level: string;
+  /** Idioma sendo aprendido. */
+  targetName: string;
+  /** Idioma que se comporta como o alvo (pode nao existir). */
+  allyName: string | null;
+  /** Idioma que se comporta de forma diferente. */
+  contrastName: string;
+  /** Como cada idioma resolve o conceito, ja escrito no catalogo. */
+  behavior: string;
+  /** Frases paralelas do catalogo, para a IA nao fugir do padrao. */
+  examples: string;
+}
+
+/**
+ * Exercicios de contraste.
+ *
+ * Duas decisoes deliberadas neste prompt:
+ *
+ * 1. O catalogo entra como VERDADE, nao como sugestao. O modelo recebe o mapa
+ *    pronto e e proibido de contradiz-lo. Gramatica errada e o unico erro
+ *    deste modulo que o aluno leva para a vida.
+ *
+ * 2. Todo exercicio e ancorado em frase paralela. Nao pedimos "faca um
+ *    exercicio de artigos"; pedimos a mesma frase nos idiomas envolvidos, com
+ *    uma lacuna. E o formato que obriga a comparacao a acontecer na cabeca do
+ *    aluno em vez de ficar so na explicacao.
+ */
+export function contrastDrillPrompt(ctx: ContrastContext, count: number): string {
+  const support = ctx.allyName
+    ? `O ${ctx.allyName} se comporta como o ${ctx.targetName} neste ponto: use-o para CONFIRMAR a intuicao do aluno.
+O ${ctx.contrastName} se comporta de forma diferente: use-o para marcar o CONTRASTE.`
+    : `Neste topico nenhum outro idioma se comporta como o ${ctx.targetName}.
+Use o ${ctx.contrastName} para marcar o contraste e deixe claro que o ${ctx.targetName} esta sozinho.`;
+
+  return `Voce escreve exercicios de gramatica contrastiva para um brasileiro que estuda
+ingles, espanhol e alemao AO MESMO TEMPO. Ele fala portugues nativo.
+
+O objetivo do exercicio nao e testar uma regra isolada: e fazer o aluno PERCEBER a diferenca
+entre os idiomas, comparando a mesma frase lado a lado.
+
+TOPICO: ${ctx.title}
+DUVIDA DO ALUNO: ${ctx.question}
+IDIOMA ALVO: ${ctx.targetName}
+NIVEL: ${ctx.level}
+
+COMO CADA IDIOMA RESOLVE ISTO (fato estabelecido, NAO contradiga):
+${ctx.behavior}
+
+${support}
+
+EXEMPLOS JA EXISTENTES (nao repita nenhum destes, crie frases novas):
+${ctx.examples}
+
+Gere ${count} exercicios, alternando os dois tipos abaixo.
+
+TIPO "mirror": a mesma frase em varios idiomas, com UMA lacuna no idioma alvo,
+marcada por ___ (tres sublinhados). O aluno ve as outras versoes e deduz a do alvo.
+
+  REGRA CRITICA da lacuna: ela tem de cair EXATAMENTE na estrutura que este topico
+  ensina. Se o topico e sobre prefixo separavel, a lacuna cai no prefixo ou no verbo
+  separado -- nunca num pronome, num artigo ou num substantivo qualquer da frase.
+  Uma lacuna fora do ponto transforma o exercicio em outro assunto e nao ensina nada.
+
+  O campo "shown" precisa trazer pelo menos o idioma de apoio citado acima, porque e
+  comparando com ele que o aluno deduz a resposta. Nunca mostre o idioma alvo em "shown".
+
+TIPO "trap": uma frase ERRADA no idioma alvo, do tipo que um brasileiro que tambem
+estuda os outros dois idiomas realmente escreveria por interferencia. O aluno corrige.
+
+  REGRA CRITICA do trap: "sentence" tem de estar mesmo ERRADA e ser DIFERENTE de
+  "answer". Se voce nao consegue pensar num erro plausivel, escreva um exercicio
+  "mirror" no lugar -- nunca entregue um trap cuja frase ja esta correta, e nunca
+  marque como errada uma frase que um nativo diria sem estranhar.
+  O erro vem do contraste entre idiomas, nunca de digitacao ou de acento.
+
+Regras:
+- Frases curtas, cotidianas, no nivel ${ctx.level}.
+- Nunca explique a regra dentro do enunciado: a explicacao vem depois da resposta.
+- So cite na explicacao idiomas que aparecem neste exercicio ou no mapa acima.
+- Toda frase que voce apresentar como correta tem de ser natural para um nativo.
+- A explicacao sempre em portugues, em no maximo 2 frases, citando o outro idioma.
+- Em "mirror", "answer" e SO o que preenche a lacuna, nao a frase inteira.
+- Em "trap", "answer" e a frase inteira corrigida.
+
+Responda APENAS com JSON valido:
+{
+  "drills": [
+    {
+      "type": "mirror",
+      "gloss": "o que a frase quer dizer, em portugues",
+      "shown": [
+        { "lang": "pt", "text": "a frase em portugues" },
+        { "lang": "es", "text": "a frase no idioma de apoio" }
+      ],
+      "sentence": "a frase no idioma alvo com ___ na lacuna",
+      "answer": "so o trecho que preenche a lacuna",
+      "explanation": "por que e assim, comparando com os outros idiomas"
+    },
+    {
+      "type": "trap",
+      "gloss": "o que a frase quer dizer, em portugues",
+      "shown": [],
+      "sentence": "a frase ERRADA no idioma alvo",
+      "answer": "a frase inteira corrigida",
+      "explanation": "de qual idioma veio a interferencia e qual e a regra do alvo"
+    }
+  ]
+}
+Use apenas os codigos "pt", "en", "es", "de" no campo "lang".`;
+}

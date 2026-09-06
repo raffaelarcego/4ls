@@ -5,6 +5,7 @@ import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { GrammarPage } from './features/grammar/GrammarPage';
 import { SessionPage } from './features/study/SessionPage';
 import { TutorPage } from './features/tutor/TutorPage';
 import { VocabularyPage } from './features/vocabulary/VocabularyPage';
@@ -61,6 +62,7 @@ export function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/vocabulario" element={<VocabularyPage />} />
+              <Route path="/estruturas" element={<GrammarPage />} />
               <Route path="/tutor" element={<TutorPage />} />
               <Route path="/progresso" element={<AnalyticsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

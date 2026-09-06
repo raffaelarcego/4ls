@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErrorsModule } from './modules/errors/errors.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
+import { GrammarModule } from './modules/grammar/grammar.module';
 import { HealthModule } from './modules/health/health.module';
 import { LanguagesModule } from './modules/languages/languages.module';
 import { ReviewModule } from './modules/review/review.module';
@@ -29,6 +30,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     ReviewModule,
     ErrorsModule,
     GamificationModule,
+    GrammarModule,
     StudyModule,
     TutorModule,
     SpeechFeatureModule,

@@ -36,6 +36,15 @@ export function CardsIcon({ className }: IconProps) {
   );
 }
 
+export function PuzzleIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M10 3h4a1 1 0 0 1 1 1v1.5a2 2 0 1 0 4 0V4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1.5a2 2 0 1 0 0 4H20a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4" />
+      <path d="M10 3a1 1 0 0 0-1 1v1.5a2 2 0 1 1-4 0V4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1.5a2 2 0 1 1 0 4H4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h6" />
+    </svg>
+  );
+}
+
 export function ChatIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>
