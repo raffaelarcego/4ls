@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { ElevenLabsProvider } from './elevenlabs.provider';
 import { MimoSpeechProvider } from './mimo-speech.provider';
 import { OpenAiSpeechProvider } from './openai-speech.provider';
+import { OpenRouterSpeechProvider } from './openrouter-speech.provider';
 import {
   MAX_TTS_CHARS,
   SpeechProvider,
@@ -50,12 +51,23 @@ export class SpeechRouterService {
     mimo: MimoSpeechProvider,
     openai: OpenAiSpeechProvider,
     elevenlabs: ElevenLabsProvider,
+    openrouter: OpenRouterSpeechProvider,
   ) {
-    const byName: Record<string, SpeechProvider> = { mimo, openai, elevenlabs };
-    // MiMo primeiro: usa a chave que ja existe para texto, entao voz natural
-    // funciona sem configurar mais nada.
+    const byName: Record<string, SpeechProvider> = { mimo, openai, elevenlabs, openrouter };
+    /*
+     * OpenRouter primeiro, MiMo depois.
+     *
+     * A MiMo usava a mesma chave do texto e por isso vinha na frente, mas ela
+     * so tem vozes inglesas e chinesas: espanhol e alemao saiam com fonetica
+     * inglesa, irreconheciveis ate para um ASR. O OpenRouter usa a mesma chave
+     * e pronuncia os tres idiomas corretamente -- e mais caro por frase, o que
+     * o cache de clipes amortiza, ja que cada frase e sintetizada uma vez so.
+     *
+     * A MiMo continua na cadeia como reserva: se o OpenRouter cair, uma voz
+     * com sotaque errado ainda e melhor que silencio.
+     */
     this.chain = config
-      .get<string>('SPEECH_PROVIDER_ORDER', 'mimo,openai,elevenlabs')
+      .get<string>('SPEECH_PROVIDER_ORDER', 'openrouter,mimo,openai,elevenlabs')
       .split(',')
       .map((s) => byName[s.trim().toLowerCase()])
       .filter((p): p is SpeechProvider => Boolean(p));
@@ -300,7 +312,7 @@ export class SpeechRouterService {
  * efeito nenhum nas frases ja sintetizadas -- que sao justamente as mais
  * ouvidas. Suba o numero sempre que mudar como um idioma deve soar.
  */
-const CLIP_RECIPE_VERSION = 2;
+const CLIP_RECIPE_VERSION = 3;
 
 function clipHash(text: string, input: SynthesizeInput): string {
   return createHash('sha256')
@@ -312,6 +324,11 @@ function clipHash(text: string, input: SynthesizeInput): string {
 
 /** Estimativas grosseiras em USD, so para ranquear custo entre providers. */
 const TTS_PRICE_PER_1K_CHARS: Record<string, number> = {
+  // Este cobra por token de audio, nao por caractere. O valor abaixo veio de
+  // medir uma frase real (~28 caracteres custaram US$ 0,00024) e serve so para
+  // ranquear custo entre providers, que e o proposito destas estimativas.
+  'openai/gpt-audio-mini': 0.009,
+  'openai/gpt-audio': 0.24,
   'gpt-4o-mini-tts': 0.015,
   'tts-1': 0.015,
   'tts-1-hd': 0.03,

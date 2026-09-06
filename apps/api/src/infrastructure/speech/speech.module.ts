@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ElevenLabsProvider } from './elevenlabs.provider';
 import { MimoSpeechProvider } from './mimo-speech.provider';
 import { OpenAiSpeechProvider } from './openai-speech.provider';
+import { OpenRouterSpeechProvider } from './openrouter-speech.provider';
 import { SpeechRouterService } from './speech-router.service';
 
 /**
@@ -10,7 +11,13 @@ import { SpeechRouterService } from './speech-router.service';
  */
 @Global()
 @Module({
-  providers: [MimoSpeechProvider, OpenAiSpeechProvider, ElevenLabsProvider, SpeechRouterService],
+  providers: [
+    OpenRouterSpeechProvider,
+    MimoSpeechProvider,
+    OpenAiSpeechProvider,
+    ElevenLabsProvider,
+    SpeechRouterService,
+  ],
   exports: [SpeechRouterService],
 })
 export class SpeechModule {}
