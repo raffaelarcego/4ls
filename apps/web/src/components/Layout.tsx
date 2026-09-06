@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
 import { DashboardData } from '../types';
 import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
+import { InstallPrompt } from './InstallPrompt';
 
 const NAV = [
   { to: '/', label: 'Aprender', Icon: HomeIcon, tone: 'text-macaw' },
@@ -88,7 +89,14 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Abas (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t-2 border-swan bg-white lg:hidden">
+      {/* grid-cols segue o tamanho de NAV: com um item a mais e a contagem
+          fixa, o quinto icone quebrava para uma segunda linha.
+          pb-[env(safe-area-inset-bottom)] mantem as abas acima da barra
+          de gestos do iPhone, ja que o viewport e viewport-fit=cover. */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 grid border-t-2 border-swan bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+        style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }}
+      >
         {NAV.map(({ to, label, Icon, tone }) => (
           <NavLink
             key={to}
@@ -113,6 +121,8 @@ export function Layout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
+
+      <InstallPrompt />
     </div>
   );
 }

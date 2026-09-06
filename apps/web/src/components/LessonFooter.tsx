@@ -37,7 +37,9 @@ export function LessonFooter({
   const style = TONE[tone];
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 z-20 border-t-2 ${style.wrap}`}>
+    <div
+      className={`fixed inset-x-0 bottom-0 z-20 border-t-2 pb-[env(safe-area-inset-bottom)] ${style.wrap}`}
+    >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           {title && (

@@ -312,7 +312,7 @@ export class SpeechRouterService {
  * efeito nenhum nas frases ja sintetizadas -- que sao justamente as mais
  * ouvidas. Suba o numero sempre que mudar como um idioma deve soar.
  */
-const CLIP_RECIPE_VERSION = 3;
+const CLIP_RECIPE_VERSION = 4;
 
 function clipHash(text: string, input: SynthesizeInput): string {
   return createHash('sha256')

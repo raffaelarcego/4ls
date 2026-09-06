@@ -5,8 +5,28 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "//": "SPA: toda rota cai no index.html -- MENOS os arquivos que precisam ser servidos como si mesmos. O manifest e o service worker sao os criticos: servidos como HTML, o navegador nunca oferece a instalacao, e sem mensagem de erro.",
+      "source": "/((?!assets/|sw\\.js|manifest\\.webmanifest|robots\\.txt|.*\\.png$).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "//": "O service worker nao pode ficar preso em cache: se o navegador servir o sw.js antigo, nenhuma versao nova do app chega ao aluno instalado.",
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "//": "Bundles do Vite tem hash no nome: sao imutaveis e podem ficar em cache para sempre.",
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }
