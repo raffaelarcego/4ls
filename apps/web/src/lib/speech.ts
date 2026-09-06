@@ -366,7 +366,13 @@ interface SpeechRecognitionLike {
   start(): void;
   stop(): void;
   abort(): void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult:
+    | ((event: {
+        /** Indice do primeiro resultado novo desta rodada. */
+        resultIndex: number;
+        results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }>;
+      }) => void)
+    | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 }
@@ -408,8 +414,20 @@ export function recognizeInBrowser(languageCode: string): {
 
   const promise = new Promise<string>((resolve, reject) => {
     recognition.onresult = (event) => {
-      for (let i = 0; i < event.results.length; i += 1) {
-        const alternative = event.results[i][0];
+      /*
+       * `event.results` e cumulativa: cada evento traz de novo tudo que ja foi
+       * reconhecido na sessao. Varrer a lista inteira a cada evento repetiria
+       * o texto em progressao quadratica (1+2+3+...), que era o que fazia
+       * vinte segundos de fala virarem milhares de linhas. So o trecho a
+       * partir de `resultIndex` e novidade.
+       */
+      const from = event.resultIndex ?? 0;
+      for (let i = from; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        // Com interimResults=false so chegam finais, mas o Safari manda
+        // parciais mesmo assim -- e um parcial vira final no evento seguinte.
+        if (result.isFinal === false) continue;
+        const alternative = result[0];
         if (alternative?.transcript) transcript += `${alternative.transcript} `;
       }
     };

@@ -292,9 +292,21 @@ export class SpeechRouterService {
   }
 }
 
+/**
+ * Versao da receita de sintese (estilo, sotaque, escolha de voz por idioma).
+ *
+ * Entra no hash para que uma mudanca nessa receita nao continue servindo os
+ * clipes antigos do cache. Sem isso, corrigir o sotaque do espanhol nao teria
+ * efeito nenhum nas frases ja sintetizadas -- que sao justamente as mais
+ * ouvidas. Suba o numero sempre que mudar como um idioma deve soar.
+ */
+const CLIP_RECIPE_VERSION = 2;
+
 function clipHash(text: string, input: SynthesizeInput): string {
   return createHash('sha256')
-    .update(`${input.languageCode}|${input.voice ?? 'auto'}|${input.speed ?? 1}|${text}`)
+    .update(
+      `v${CLIP_RECIPE_VERSION}|${input.languageCode}|${input.voice ?? 'auto'}|${input.speed ?? 1}|${text}`,
+    )
     .digest('hex');
 }
 

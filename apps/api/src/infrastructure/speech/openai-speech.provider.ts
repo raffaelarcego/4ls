@@ -14,7 +14,13 @@ import {
  * OpenAI (`/audio/speech` e `/audio/transcriptions`). Isso cobre a propria
  * OpenAI, o Azure OpenAI e os gateways compativeis -- basta trocar a base URL.
  *
- * E o unico provider do projeto que faz as duas pontas: falar e ouvir.
+ * E o unico provider do projeto que faz as duas pontas: falar e ouvir -- mas
+ * nem todo host faz as duas. O OpenRouter, por exemplo, serve
+ * `/audio/transcriptions` (com `openai/whisper-1`) e nao serve
+ * `/audio/speech`. Por isso cada ponta e habilitada pelo seu proprio modelo:
+ * modelo em branco significa "este host nao tem essa rota", e a cadeia nem
+ * tenta. Sem isso, apontar a base URL para o OpenRouter faria toda sintese
+ * bater num 400 antes de cair para o proximo provider.
  */
 @Injectable()
 export class OpenAiSpeechProvider implements SpeechProvider {
@@ -27,28 +33,41 @@ export class OpenAiSpeechProvider implements SpeechProvider {
   private readonly defaultVoice: string;
   private readonly voiceByLanguage: Record<string, string>;
 
-  constructor(config: ConfigService) {
-    this.baseUrl = config.get<string>('SPEECH_BASE_URL', 'https://api.openai.com/v1');
-    this.apiKey = config.get<string>('SPEECH_API_KEY', '');
-    this.tts = config.get<string>('SPEECH_TTS_MODEL', 'gpt-4o-mini-tts');
-    this.stt = config.get<string>('SPEECH_STT_MODEL', 'whisper-1');
-    this.defaultVoice = config.get<string>('SPEECH_VOICE', 'alloy');
+  constructor(configService: ConfigService) {
+    // Variavel declarada em branco no .env chega como '' e nao dispara o
+    // default do ConfigService; aqui em branco e ausente valem o mesmo.
+    const config = {
+      get: (key: string, fallback: string): string =>
+        configService.get<string>(key, '')?.trim() || fallback,
+    };
+
+    this.baseUrl = config.get('SPEECH_BASE_URL', 'https://api.openai.com/v1');
+    this.apiKey = config.get('SPEECH_API_KEY', '');
+    /*
+     * "off" desliga a ponta. Precisa ser uma palavra e nao o vazio porque o
+     * vazio cai no default -- e o default aqui existe justamente para o caso
+     * comum (OpenAI, que tem as duas rotas). Quem aponta a base URL para um
+     * host com so uma das rotas escreve o "off" na outra.
+     */
+    this.tts = enabled(config.get('SPEECH_TTS_MODEL', 'gpt-4o-mini-tts'));
+    this.stt = enabled(config.get('SPEECH_STT_MODEL', 'whisper-1'));
+    this.defaultVoice = config.get('SPEECH_VOICE', 'alloy');
 
     // As vozes da OpenAI sao multilingues, mas timbres diferentes por idioma
     // ajudam o aluno a nao confundir os tres cursos.
     this.voiceByLanguage = {
-      en: config.get<string>('SPEECH_VOICE_EN', 'alloy'),
-      es: config.get<string>('SPEECH_VOICE_ES', 'nova'),
-      de: config.get<string>('SPEECH_VOICE_DE', 'onyx'),
+      en: config.get('SPEECH_VOICE_EN', 'alloy'),
+      es: config.get('SPEECH_VOICE_ES', 'nova'),
+      de: config.get('SPEECH_VOICE_DE', 'onyx'),
     };
   }
 
   canSynthesize(): boolean {
-    return Boolean(this.apiKey && this.baseUrl);
+    return Boolean(this.apiKey && this.baseUrl && this.tts);
   }
 
   canTranscribe(): boolean {
-    return this.canSynthesize();
+    return Boolean(this.apiKey && this.baseUrl && this.stt);
   }
 
   ttsModel(): string {
@@ -168,6 +187,11 @@ export class OpenAiSpeechProvider implements SpeechProvider {
       latencyMs: Date.now() - startedAt,
     };
   }
+}
+
+/** Normaliza o desligamento explicito de uma das pontas para string vazia. */
+function enabled(model: string): string {
+  return model.toLowerCase() === 'off' ? '' : model;
 }
 
 /** O Whisper decide o decoder pela extensao do arquivo enviado. */

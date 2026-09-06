@@ -31,12 +31,24 @@ export class MimoSpeechProvider implements SpeechProvider {
   private readonly tts: string;
   private readonly asr: string;
   private readonly style: string;
+  private readonly accentByLanguage: Record<string, string>;
   private readonly defaultVoice: string;
   private readonly voiceByLanguage: Record<string, string>;
   private readonly asrLanguages: Set<string>;
   private readonly asrFormats: Set<string>;
 
-  constructor(config: ConfigService) {
+  constructor(configService: ConfigService) {
+    /*
+     * Uma variavel declarada vazia no .env ("MIMO_TTS_STYLE=") chega aqui como
+     * string vazia, e nao como ausente -- entao o default do ConfigService nao
+     * dispara e o estilo sumiria. Como o .env.example documenta o vazio como
+     * "usa o padrao", tratamos em branco e ausente do mesmo jeito.
+     */
+    const config = {
+      get: <T extends string>(key: string, fallback: T): T | string =>
+        configService.get<string>(key, '')?.trim() || fallback,
+    };
+
     this.baseUrl = config.get<string>('MIMO_BASE_URL', 'https://api.xiaomimimo.com/v1');
     this.apiKey = config.get<string>('MIMO_API_KEY', '');
     this.tts = config.get<string>('MIMO_TTS_MODEL', 'mimo-v2.5-tts');
@@ -46,6 +58,38 @@ export class MimoSpeechProvider implements SpeechProvider {
       'MIMO_TTS_STYLE',
       'Clear, natural pace, neutral and friendly tone, as a language teacher reading an example aloud. Do not add words.',
     );
+
+    /*
+     * Sotaque.
+     *
+     * A instrucao de estilo e o unico controle de pronuncia que a MiMo expoe
+     * -- nao ha parametro de idioma na chamada. Sem dizer nada, o modelo le
+     * espanhol e alemao com a fonetica da voz base, e sai um "hola" com
+     * sotaque americano.
+     *
+     * A instrucao de cada idioma vai escrita NO PROPRIO IDIOMA: alem do que
+     * ela pede em palavras, o idioma em que esta escrita ja e por si o sinal
+     * mais forte de qual fonetica ativar. Por isso nao traduza estas linhas
+     * para portugues.
+     */
+    this.accentByLanguage = {
+      en: config.get<string>(
+        'MIMO_ACCENT_EN',
+        'Speak in English as a native speaker, with a natural standard American English accent.',
+      ),
+      es: config.get<string>(
+        'MIMO_ACCENT_ES',
+        'Habla en español como un hablante nativo de España, con acento castellano natural: distingue la c/z de la s, pronuncia la r vibrante y la j velar, y no uses en ningún momento pronunciación inglesa.',
+      ),
+      de: config.get<string>(
+        'MIMO_ACCENT_DE',
+        'Sprich Deutsch wie ein Muttersprachler, mit natürlichem Hochdeutsch: klares gerolltes bzw. uvulares R, korrekte Umlaute (ä, ö, ü), harte Endkonsonanten und der Ich-Laut in „ich". Verwende auf keinen Fall eine englische Aussprache.',
+      ),
+      pt: config.get<string>(
+        'MIMO_ACCENT_PT',
+        'Fale em português do Brasil como falante nativo, com sotaque brasileiro natural e neutro.',
+      ),
+    };
 
     // Timbres distintos por idioma ajudam o aluno a nao confundir os cursos.
     this.defaultVoice = config.get<string>('MIMO_VOICE', 'Mia');
@@ -134,6 +178,16 @@ export class MimoSpeechProvider implements SpeechProvider {
     return (await response.json()) as MimoChatResponse;
   }
 
+  /**
+   * Estilo + sotaque do idioma. O sotaque vem primeiro de proposito: e a
+   * primeira instrucao que o modelo le, e o resto (ritmo, tom) so ajusta uma
+   * pronuncia que ja nasceu no idioma certo.
+   */
+  private styleFor(languageCode: string): string {
+    const accent = this.accentByLanguage[languageCode.toLowerCase()];
+    return accent ? `${accent} ${this.style}` : this.style;
+  }
+
   async synthesize(input: SynthesizeInput): Promise<SynthesizeResult> {
     if (!this.canSynthesize()) {
       throw new SpeechProviderError(this.name, 'provider nao configurado (falta MIMO_API_KEY)');
@@ -146,7 +200,7 @@ export class MimoSpeechProvider implements SpeechProvider {
       {
         model: this.tts,
         messages: [
-          { role: 'user', content: this.style },
+          { role: 'user', content: this.styleFor(input.languageCode) },
           // O texto a falar vai aqui, no assistant. Nao inverta.
           { role: 'assistant', content: input.text },
         ],
