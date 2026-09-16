@@ -60,7 +60,7 @@ export class SpeechRouterService {
      * A MiMo usava a mesma chave do texto e por isso vinha na frente, mas ela
      * so tem vozes inglesas e chinesas: espanhol e alemao saiam com fonetica
      * inglesa, irreconheciveis ate para um ASR. O OpenRouter usa a mesma chave
-     * e pronuncia os tres idiomas corretamente -- e mais caro por frase, o que
+     * e pronuncia os quatro idiomas corretamente -- e mais caro por frase, o que
      * o cache de clipes amortiza, ja que cada frase e sintetizada uma vez so.
      *
      * A MiMo continua na cadeia como reserva: se o OpenRouter cair, uma voz

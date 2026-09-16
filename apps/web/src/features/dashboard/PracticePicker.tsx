@@ -11,7 +11,9 @@ import { DashboardLanguage } from '../../types';
  */
 const TYPES = [
   'review',
+  'structure',
   'vocabulary',
+  'production',
   'grammar',
   'listening',
   'dictation',

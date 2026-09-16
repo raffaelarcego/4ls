@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AudioButton } from '../../components/AudioButton';
 import { LessonFooter } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
+import { languageTheme } from '../../lib/ui';
 import { api } from '../../services/api';
 import { ReviewGrade, ReviewItem } from '../../types';
 
@@ -47,6 +48,8 @@ export function ReviewRunner({
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [correct, setCorrect] = useState(0);
+  /** O aluno pediu o andaime neste card -- ele so aparece a pedido. */
+  const [hinted, setHinted] = useState(false);
 
   const { data: items, isLoading } = useQuery<ReviewItem[]>({
     queryKey: ['review', 'due', languageCode],
@@ -114,6 +117,7 @@ export function ReviewRunner({
     grade.mutate({ id: item.id, grade: value });
     if (value !== 'again') setCorrect((c) => c + 1);
     setRevealed(false);
+    setHinted(false);
     setIndex((i) => i + 1);
   }
 
@@ -152,15 +156,62 @@ export function ReviewRunner({
               )}
             </div>
           ) : (
-            <p className="text-sm font-semibold text-hare">
-              Tente lembrar o significado antes de revelar.
-            </p>
+            <div className="w-full space-y-3">
+              <p className="text-sm font-semibold text-hare">
+                Tente lembrar o significado antes de revelar.
+              </p>
+
+              {/*
+                O andaime: a mesma coisa num idioma que o aluno ja domina.
+                So existe quando o significado ja firmou em outro idioma e a
+                forma deste ainda nao -- ou seja, exatamente quando o problema e
+                puxar a palavra, e nao entender o conceito. E ele fica atras de
+                um botao porque a dica dada cedo demais rouba o esforco de
+                recuperacao, que e o que consolida a memoria.
+              */}
+              {item.scaffold &&
+                (hinted ? (
+                  <div
+                    className={`mx-auto flex max-w-xs items-center justify-center gap-2.5 rounded-2xl border-2 px-3.5 py-2.5 ${
+                      languageTheme(item.scaffold.languageCode).border
+                    } ${languageTheme(item.scaffold.languageCode).soft}`}
+                  >
+                    <span aria-hidden className="text-xl">
+                      {languageTheme(item.scaffold.languageCode).flag}
+                    </span>
+                    <div className="text-left">
+                      <p className="text-base font-black leading-tight">{item.scaffold.term}</p>
+                      <p className="text-[10px] font-extrabold uppercase tracking-wide text-hare">
+                        você já sabe esta
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn-plain text-xs" onClick={() => setHinted(true)}>
+                    Dica: como é em outro idioma
+                  </button>
+                ))}
+            </div>
           )}
         </div>
       </div>
 
       {revealed ? (
-        <LessonFooter title="Quão fácil foi?" detail="Isso define quando o card volta.">
+        <LessonFooter
+          title="Quão fácil foi?"
+          detail={
+            /*
+             * A mensagem muda conforme o que o conceito ja mostrou. Quando o
+             * significado esta firme em outros idiomas e este card nao, a tela
+             * para de tratar o erro como "nao sabe a palavra" e diz o que
+             * realmente esta acontecendo -- e o aluno para de achar que esta
+             * recomecando do zero num idioma em que ja avancou.
+             */
+            item.scaffold
+              ? 'Você já sabe este conceito em outro idioma — aqui falta só a forma.'
+              : 'Isso define quando o card volta.'
+          }
+        >
           <div className="grid w-full grid-cols-4 gap-2 sm:w-auto">
             {GRADES.map((option) => (
               <button

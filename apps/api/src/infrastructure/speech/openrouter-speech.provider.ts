@@ -56,6 +56,7 @@ export class OpenRouterSpeechProvider implements SpeechProvider {
       en: get('OPENROUTER_VOICE_EN', 'alloy'),
       es: get('OPENROUTER_VOICE_ES', 'coral'),
       de: get('OPENROUTER_VOICE_DE', 'ash'),
+      ru: get('OPENROUTER_VOICE_RU', 'echo'),
       pt: get('OPENROUTER_VOICE_PT', 'sage'),
     };
   }
@@ -166,6 +167,7 @@ const LANGUAGE_LABEL: Record<string, string> = {
   en: 'English',
   es: 'Spanish (Spain)',
   de: 'German',
+  ru: 'Russian',
   pt: 'Brazilian Portuguese',
 };
 
@@ -206,6 +208,7 @@ const FEW_SHOT: Record<string, [string, string]> = {
   en: ['window', 'Good morning.'],
   es: ['ventana', 'Buenos días.'],
   de: ['Fenster', 'Guten Morgen.'],
+  ru: ['окно', 'Доброе утро.'],
   pt: ['janela', 'Bom dia.'],
 };
 

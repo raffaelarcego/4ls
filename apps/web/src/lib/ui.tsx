@@ -49,6 +49,14 @@ const LANGUAGE_THEMES: Record<string, LanguageTheme> = {
     soft: 'bg-cardinal-soft',
     border: 'border-cardinal',
   },
+  ru: {
+    flag: '🇷🇺',
+    bg: 'bg-humpback',
+    shadow: 'shadow-[0_4px_0_theme(colors.humpback-dark)]',
+    text: 'text-humpback-dark',
+    soft: 'bg-humpback-soft',
+    border: 'border-humpback',
+  },
 };
 
 export function languageTheme(code: string): LanguageTheme {
@@ -64,7 +72,9 @@ export interface ActivityTheme {
 
 const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   review: { label: 'Revisão', emoji: '🔁', blurb: 'Cards que venceram hoje' },
-  vocabulary: { label: 'Vocabulário', emoji: '💬', blurb: 'Palavras novas em contexto' },
+  vocabulary: { label: 'Vocabulário', emoji: '💬', blurb: 'O mesmo conceito nos 4 idiomas' },
+  structure: { label: 'Estrutura', emoji: '🧱', blurb: 'Como montar a frase neste idioma' },
+  production: { label: 'Produção', emoji: '🎤', blurb: 'A mesma frase nos 4 idiomas' },
   grammar: { label: 'Gramática', emoji: '🧩', blurb: 'Estrutura e formas' },
   listening: { label: 'Escuta', emoji: '🎧', blurb: 'Diálogo falado + compreensão' },
   dictation: { label: 'Ditado', emoji: '🎙️', blurb: 'Ouvir e escrever' },

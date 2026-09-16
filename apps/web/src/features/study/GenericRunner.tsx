@@ -8,7 +8,10 @@ import { api, errorMessage } from '../../services/api';
 import { SessionActivity } from '../../types';
 import { DictationRunner } from './DictationRunner';
 import { ListeningRunner } from './ListeningRunner';
+import { ProductionRunner } from './ProductionRunner';
 import { SpeakingRunner } from './SpeakingRunner';
+import { StructureRunner } from './StructureRunner';
+import { VocabularyRunner } from './VocabularyRunner';
 
 interface Exercise {
   prompt: string;
@@ -19,7 +22,7 @@ interface Exercise {
 }
 
 /** Tipos para os quais a IA consegue gerar exercicios objetivos e corrigiveis. */
-const EXERCISE_TYPES = new Set(['grammar', 'vocabulary', 'reading']);
+const EXERCISE_TYPES = new Set(['grammar', 'reading']);
 
 export function GenericRunner({
   activity,
@@ -35,6 +38,19 @@ export function GenericRunner({
   // tem como ser medido automaticamente.
   if (EXERCISE_TYPES.has(activity.type)) {
     return <ExerciseRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Vocabulario deixou de ser exercicio avulso: agora e o bloco de conceitos,
+  // que mostra o mesmo significado nos quatro idiomas de uma vez.
+  if (activity.type === 'vocabulary') {
+    return <VocabularyRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Producao quadrupla atravessa os idiomas: o bloco pertence nominalmente a
+  // um, mas cobra a mesma frase em todos.
+  if (activity.type === 'production') {
+    return <ProductionRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  if (activity.type === 'structure') {
+    return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'listening') {
     return <ListeningRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;

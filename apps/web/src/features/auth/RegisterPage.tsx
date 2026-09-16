@@ -35,7 +35,7 @@ export function RegisterPage() {
           4L<span className="text-macaw">.</span>
         </h1>
         <p className="text-sm font-bold text-wolf">
-          Sua conta já começa com 🇬🇧 🇪🇸 🇩🇪 configurados.
+          Sua conta já começa com 🇬🇧 🇪🇸 🇩🇪 🇷🇺 configurados.
         </p>
       </div>
 

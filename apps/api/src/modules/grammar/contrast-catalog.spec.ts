@@ -7,7 +7,7 @@ import {
   topicsFor,
 } from './contrast-catalog';
 
-const ALL: Lang[] = ['pt', 'en', 'es', 'de'];
+const ALL: Lang[] = ['pt', 'en', 'es', 'de', 'ru'];
 
 describe('catalogo de contrastes', () => {
   it('nao repete id', () => {
@@ -15,17 +15,17 @@ describe('catalogo de contrastes', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('particiona os quatro idiomas em groups, sem sobra nem repeticao', () => {
+  it('particiona os cinco idiomas em groups, sem sobra nem repeticao', () => {
     // `groups` e a fonte de verdade de quem ajuda e quem contrasta. Um idioma
     // faltando ali faria supportFor devolver a resposta errada em silencio.
     for (const topic of CONTRAST_TOPICS) {
       const flat = topic.groups.flat();
       expect(new Set(flat).size, `${topic.id}: idioma repetido entre grupos`).toBe(flat.length);
-      expect([...flat].sort(), `${topic.id}: groups nao cobre os 4 idiomas`).toEqual([...ALL].sort());
+      expect([...flat].sort(), `${topic.id}: groups nao cobre os 5 idiomas`).toEqual([...ALL].sort());
     }
   });
 
-  it('descreve o comportamento dos quatro idiomas', () => {
+  it('descreve o comportamento dos cinco idiomas', () => {
     for (const topic of CONTRAST_TOPICS) {
       for (const lang of ALL) {
         expect(topic.behavior[lang]?.length, `${topic.id}/${lang}`).toBeGreaterThan(0);
@@ -42,7 +42,7 @@ describe('catalogo de contrastes', () => {
     }
   });
 
-  it('preenche os exemplos nos quatro idiomas', () => {
+  it('preenche os exemplos nos cinco idiomas', () => {
     for (const topic of CONTRAST_TOPICS) {
       expect(topic.examples.length, `${topic.id} sem exemplo`).toBeGreaterThan(0);
       for (const example of topic.examples) {
@@ -72,13 +72,24 @@ describe('supportFor', () => {
   });
 
   it('devolve aliado nulo quando o alvo esta sozinho no grupo', () => {
-    // Casos: o alemao nao tem companhia. Forcar um aliado aqui seria mentir --
+    // Ser/estar: portugues e espanhol usam dois verbos, ingles e alemao um, e o
+    // russo nenhum. O russo fica sozinho, e forcar um aliado ali seria mentir --
     // o topico usa o campo `bridge` para explicar a analogia parcial.
-    const topic = CONTRAST_TOPICS.find((t) => t.id === 'cases')!;
-    const support = supportFor(topic, 'de');
+    const topic = CONTRAST_TOPICS.find((t) => t.id === 'ser-estar')!;
+    const support = supportFor(topic, 'ru');
     expect(support.ally).toBeNull();
     expect(support.contrast).toBe('en');
     expect(topic.bridge, 'topico sem aliado precisa de bridge').toBeTruthy();
+  });
+
+  it('usa o russo como aliado do alemao nos casos', () => {
+    // O ponto do modulo inteiro, agora com quatro idiomas: quem estuda alemao e
+    // russo ao mesmo tempo nao precisa aprender "caso" duas vezes. Antes do
+    // russo entrar, este topico nao tinha aliado nenhum.
+    const topic = CONTRAST_TOPICS.find((t) => t.id === 'cases')!;
+    expect(supportFor(topic, 'de').ally).toBe('ru');
+    expect(supportFor(topic, 'ru').ally).toBe('de');
+    expect(supportFor(topic, 'de').contrast).toBe('en');
   });
 
   it('nunca aponta o proprio alvo como apoio', () => {
@@ -111,7 +122,7 @@ describe('supportFor', () => {
 });
 
 describe('topicsFor', () => {
-  it('da conteudo para os tres idiomas de estudo', () => {
+  it('da conteudo para os quatro idiomas de estudo', () => {
     for (const lang of STUDY_LANGUAGES) {
       expect(topicsFor(lang).length, `${lang} sem topicos`).toBeGreaterThan(0);
     }

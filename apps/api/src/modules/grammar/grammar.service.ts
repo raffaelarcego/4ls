@@ -107,7 +107,7 @@ export class GrammarService {
     const order: Lang[] = [target];
     if (support.ally) order.push(support.ally);
     if (support.contrast) order.push(support.contrast);
-    for (const lang of ['pt', 'en', 'es', 'de'] as Lang[]) {
+    for (const lang of ['pt', 'en', 'es', 'de', 'ru'] as Lang[]) {
       if (!order.includes(lang)) order.push(lang);
     }
 
@@ -236,7 +236,7 @@ export class GrammarService {
     if (!support.contrast) return drills;
 
     const targetName = LANG_NAME[target];
-    const options = (['pt', 'en', 'es', 'de'] as Lang[])
+    const options = (['pt', 'en', 'es', 'de', 'ru'] as Lang[])
       .filter((l) => l !== target)
       .map((l) => LANG_NAME[l]);
 
@@ -257,7 +257,7 @@ export class GrammarService {
           sentence: `Neste ponto, qual idioma funciona como o ${targetName}?`,
           answer: 'Nenhum deles',
           options: [...options, 'Nenhum deles'],
-          explanation: `O ${targetName} está sozinho neste tópico: nenhum dos outros três resolve assim. ${topic.bridge ?? ''}`.trim(),
+          explanation: `O ${targetName} está sozinho neste tópico: nenhum dos outros resolve assim. ${topic.bridge ?? ''}`.trim(),
         };
 
     return [alignment, ...drills];

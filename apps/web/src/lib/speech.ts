@@ -23,6 +23,7 @@ const LOCALE: Record<string, string> = {
   en: 'en-US',
   es: 'es-ES',
   de: 'de-DE',
+  ru: 'ru-RU',
   pt: 'pt-BR',
 };
 

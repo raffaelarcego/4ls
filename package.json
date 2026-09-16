@@ -14,7 +14,10 @@
     "db:studio": "npm run db:studio -w @4l/api",
     "build": "npm run build -w @4l/api && npm run build -w @4l/web",
     "test": "npm run test -w @4l/api",
-    "db:rewind": "npm run db:rewind -w @4l/api --"
+    "db:rewind": "npm run db:rewind -w @4l/api --",
+    "db:backfill-concepts": "npm run db:backfill-concepts -w @4l/api --",
+    "db:enroll-languages": "npm run db:enroll-languages -w @4l/api --",
+    "db:merge-concepts": "npm run db:merge-concepts -w @4l/api --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

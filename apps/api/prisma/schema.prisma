@@ -35,6 +35,7 @@ model User {
   conversations    Conversation[]
   userAchievements UserAchievement[]
   grammarProgress  GrammarProgress[]
+  conceptProgress  ConceptProgress[]
   streak           Streak?
   aiCalls          AiCallLog[]
 
@@ -43,7 +44,7 @@ model User {
 
 model Language {
   id   String @id @default(uuid())
-  code String @unique // en | es | de
+  code String @unique // en | es | de | ru
   name String
   flag String @default("")
 
@@ -51,7 +52,8 @@ model Language {
   vocabulary    Vocabulary[]
   lessons       Lesson[]
   activities    Activity[]
-  errors        ErrorRecord[]
+  errors        ErrorRecord[]  @relation("ErrorLanguage")
+  interferences ErrorRecord[]  @relation("ErrorSourceLanguage")
   assessments   Assessment[]
   conversations Conversation[]
 
@@ -97,6 +99,14 @@ model UserLanguage {
 model Vocabulary {
   id          String    @id @default(uuid())
   languageId  String
+  /**
+   * O conceito que este termo realiza neste idioma.
+   * E o que amarra "work", "trabajo", "Arbeit" e "rabota" na mesma linha: o
+   * aluno nunca aprende uma palavra solta, aprende um significado em todos os
+   * idiomas que ele estuda. Opcional porque termo criado a mao pode chegar
+   * antes de existir conceito -- o ConceptsService fecha a lacuna depois.
+   */
+  conceptId   String?
   term        String
   meaning     String
   example     String?
@@ -107,10 +117,89 @@ model Vocabulary {
   createdAt   DateTime  @default(now())
 
   language Language         @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  concept  Concept?         @relation(fields: [conceptId], references: [id], onDelete: SetNull)
   users    UserVocabulary[]
 
   @@unique([languageId, term])
+  @@index([conceptId])
   @@map("vocabulary")
+}
+
+/**
+ * Um significado, independente de idioma.
+ * O produto deixou de ensinar palavras para passar a ensinar conceitos: o que
+ * entra na sessao de hoje e "trabalho", e ele chega ao aluno simultaneamente
+ * em ingles, espanhol, alemao e russo. Isso e o que faz a memoria de um idioma
+ * sustentar a dos outros -- lembrar de "Arbeit" fica mais facil quando ela
+ * entrou junto com "work", "trabajo" e "rabota", pendurada no mesmo gancho.
+ * O slug e em portugues porque a lingua materna e o indice natural do aluno.
+ */
+model Concept {
+  id        String    @id @default(uuid())
+  /**
+   * Chave estavel em portugues, ex.: "trabalho".
+   */
+  slug      String    @unique
+  /**
+   * Como o conceito se le em portugues, ex.: "o trabalho".
+   */
+  gloss     String
+  /**
+   * Uma frase em portugues que situa o uso; vira base dos exemplos.
+   */
+  note      String?
+  level     CefrLevel @default(A1)
+  source    String    @default("seed")
+  createdAt DateTime  @default(now())
+
+  entries  Vocabulary[]
+  progress ConceptProgress[]
+
+  @@map("concepts")
+}
+
+/**
+ * O que o aluno sabe sobre um CONCEITO, acima das formas.
+ * O SRS por card ja mede cada palavra em cada idioma, e continua medindo. Mas
+ * ele nao consegue distinguir duas falhas muito diferentes:
+ * - "nao sei o que isso significa" -- o conceito nao entrou;
+ * - "sei o significado, nao consigo puxar a forma russa" -- o conceito
+ * entrou, a forma nao.
+ * Sao problemas opostos. O primeiro pede reensinar o conceito; o segundo pede
+ * so treino de recuperacao naquele idioma, e reapresentar o significado ali e
+ * desperdicio. Esta tabela e a camada que separa os dois: `meaningStrength`
+ * mede o conceito atraves de TODOS os idiomas, e e o que autoriza a revisao a
+ * mostrar a palavra que o aluno ja domina como andaime da que ele ainda erra.
+ */
+model ConceptProgress {
+  id        String @id @default(uuid())
+  userId    String
+  conceptId String
+
+  /**
+   * 0-1, media movel dos acertos do conceito em QUALQUER idioma.
+   * Alto com um card fraco significa: o significado esta la, falta a forma.
+   */
+  meaningStrength Float @default(0)
+  reviews         Int   @default(0)
+  correct         Int   @default(0)
+
+  /**
+   * Idioma em que o conceito foi recuperado com mais folga -- o candidato
+   * natural a andaime. Guardado em vez de calculado a cada revisao porque a
+   * consulta seria um join por card em toda listagem de revisao vencida.
+   */
+  anchorLanguageId String?
+
+  firstLearnedAt DateTime @default(now())
+  lastReviewAt   DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conceptId])
+  @@index([userId, meaningStrength])
+  @@map("concept_progress")
 }
 
 enum VocabStatus {
@@ -230,25 +319,40 @@ enum ErrorCategory {
 }
 
 model ErrorRecord {
-  id              String        @id @default(uuid())
-  userId          String
-  languageId      String
-  category        ErrorCategory
-  description     String
-  userText        String?
-  correctedText   String?
-  explanation     String?
-  source          String        @default("tutor") // tutor | writing | speaking | review
-  severity        Int           @default(2) // 1-3
-  occurrenceCount Int           @default(1)
-  lastOccurrence  DateTime      @default(now())
-  resolved        Boolean       @default(false)
-  createdAt       DateTime      @default(now())
+  id               String        @id @default(uuid())
+  userId           String
+  languageId       String
+  /**
+   * De qual OUTRO idioma veio a interferencia, quando o erro foi causado por
+   * ela.
+   * E o campo que separa este produto de um app de idioma solto. Quem estuda
+   * quatro linguas ao mesmo tempo quase nunca erra por ignorancia -- erra por
+   * importar a regra da lingua vizinha: ordem russa numa frase alema,
+   * "oficina" achando que e espanhol, "I have thirty years" vindo do
+   * portugues. Sem registrar a ORIGEM, todos esses viram "erro de gramatica" e
+   * o dado mais util do perfil se perde.
+   * Nulo quando o erro nao veio de interferencia (ou quando nao deu para
+   * dizer): a maioria dos erros e assim, e forcar uma origem seria inventar.
+   */
+  sourceLanguageId String?
+  category         ErrorCategory
+  description      String
+  userText         String?
+  correctedText    String?
+  explanation      String?
+  source           String        @default("tutor") // tutor | writing | speaking | review
+  severity         Int           @default(2) // 1-3
+  occurrenceCount  Int           @default(1)
+  lastOccurrence   DateTime      @default(now())
+  resolved         Boolean       @default(false)
+  createdAt        DateTime      @default(now())
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  language Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language       Language  @relation("ErrorLanguage", fields: [languageId], references: [id], onDelete: Cascade)
+  sourceLanguage Language? @relation("ErrorSourceLanguage", fields: [sourceLanguageId], references: [id], onDelete: SetNull)
 
   @@index([userId, languageId, resolved])
+  @@index([userId, sourceLanguageId])
   @@map("errors")
 }
 
@@ -471,4 +575,58 @@ model GrammarDrillSet {
 
   @@index([topicId, languageCode, level])
   @@map("grammar_drill_sets")
+}
+
+// =========================== Formacao de frase ===========================
+
+/**
+ * Aula de formacao de frase, guardada por (idioma, nivel).
+ * Saber o significado de "Arbeit" nao ensina a dizer "eu vou para o trabalho
+ * amanha de manha": cada idioma monta a frase com uma ordem, uma marcacao e
+ * umas obrigacoes proprias. Esta tabela guarda essas aulas -- formula, passos,
+ * exemplos desmontados peca a peca e exercicios -- pela mesma razao dos pools
+ * de listening e de drills: gerar de novo a cada sessao pagaria a IA para
+ * sempre, e o conteudo de estrutura e justamente o que mais se repete.
+ */
+model SentencePattern {
+  id           String   @id @default(uuid())
+  languageCode String
+  level        String
+  /**
+   * Identificador do padrao, ex.: "ordem-basica". Estavel entre geracoes.
+   */
+  patternId    String
+  title        String
+  /**
+   * A duvida do aluno, escrita como ele a formularia.
+   */
+  question     String
+  /**
+   * A regra em uma linha, ex.: "Sujeito + verbo (2a posicao) + resto".
+   */
+  formula      String
+  explanation  String
+  /**
+   * Passos de montagem da frase, em portugues.
+   */
+  steps        Json
+  /**
+   * Frases exemplo ja desmontadas em constituintes.
+   */
+  examples     Json
+  /**
+   * Erros que um brasileiro comete neste padrao.
+   */
+  pitfalls     Json
+  /**
+   * Exercicios de montagem, corrigiveis sem IA.
+   */
+  drills       Json
+  timesUsed    Int      @default(0)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([languageCode, level])
+  @@index([languageCode, patternId])
+  @@map("sentence_patterns")
 }

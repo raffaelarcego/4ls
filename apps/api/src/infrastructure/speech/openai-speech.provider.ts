@@ -54,11 +54,12 @@ export class OpenAiSpeechProvider implements SpeechProvider {
     this.defaultVoice = config.get('SPEECH_VOICE', 'alloy');
 
     // As vozes da OpenAI sao multilingues, mas timbres diferentes por idioma
-    // ajudam o aluno a nao confundir os tres cursos.
+    // ajudam o aluno a nao confundir os quatro cursos.
     this.voiceByLanguage = {
       en: config.get('SPEECH_VOICE_EN', 'alloy'),
       es: config.get('SPEECH_VOICE_ES', 'nova'),
       de: config.get('SPEECH_VOICE_DE', 'onyx'),
+      ru: config.get('SPEECH_VOICE_RU', 'echo'),
     };
   }
 

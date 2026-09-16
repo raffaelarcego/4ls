@@ -14,6 +14,9 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "db:rewind": "tsx prisma/rewind.ts",
+    "db:backfill-concepts": "nest build && node dist/prisma/backfill-concepts.js",
+    "db:enroll-languages": "tsx prisma/enroll-languages.ts",
+    "db:merge-concepts": "tsx prisma/merge-concepts.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "prisma generate"

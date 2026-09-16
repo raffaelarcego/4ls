@@ -45,3 +45,42 @@ describe('parseJsonResponse', () => {
     );
   });
 });
+
+/**
+ * Resposta truncada merece diagnostico proprio.
+ *
+ * Quando o modelo bate no teto de tokens, o JSON para no meio de uma string e
+ * o erro nativo fala de virgula faltando -- quem le vai procurar defeito no
+ * prompt, que esta correto. Custou uma investigacao inteira descobrir que o que
+ * faltava era `maxTokens`, e a mensagem existe para ninguem repetir o caminho.
+ */
+describe('parseJsonResponse: resposta truncada', () => {
+  it('acusa o teto de tokens quando a string nao fecha', () => {
+    const raw = '{"title":"Aula","examples":[{"sentence":"Я студент","translation":"Sou est';
+
+    expect(() => parseJsonResponse(raw)).toThrow(/truncada/i);
+    expect(() => parseJsonResponse(raw)).toThrow(/maxTokens/);
+  });
+
+  it('acusa quando o objeto abriu e nao fechou', () => {
+    expect(() => parseJsonResponse('{"drills":[{"gloss":"oi"}')).toThrow(/truncada/i);
+  });
+
+  it('nao confunde chave dentro de string com abertura de objeto', () => {
+    // A contagem de profundidade tem de ignorar o que esta entre aspas, senao
+    // uma explicacao que cite "{" seria lida como JSON incompleto.
+    expect(parseJsonResponse('{"nota":"use { e } com cuidado"}')).toEqual({
+      nota: 'use { e } com cuidado',
+    });
+  });
+
+  it('nao confunde aspas escapadas com fim de string', () => {
+    expect(parseJsonResponse('{"frase":"ele disse \\"oi\\" para mim"}')).toEqual({
+      frase: 'ele disse "oi" para mim',
+    });
+  });
+
+  it('segue reclamando de lixo que nao e JSON nem truncamento', () => {
+    expect(() => parseJsonResponse('desculpe, nao posso ajudar')).toThrow(/nao e JSON valido/);
+  });
+});

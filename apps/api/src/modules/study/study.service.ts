@@ -15,6 +15,19 @@ import {
   PlannedActivity,
 } from './mission.engine';
 
+/** Blocos que todo idioma recebe todo dia -- espelha DAILY_TYPES do motor. */
+const MANDATORY_TYPES = ['structure', 'vocabulary'] as const;
+
+/**
+ * De quantos em quantos dias volta a producao quadrupla.
+ *
+ * Semanal, nao diaria. Escrever a mesma frase em quatro idiomas e o exercicio
+ * mais duro do produto e, se virasse rotina, mediria memoria de curto prazo em
+ * vez de aquisicao: os conceitos precisam de tempo para assentar entre uma
+ * producao e a seguinte.
+ */
+const PRODUCTION_INTERVAL_DAYS = 7;
+
 @Injectable()
 export class StudyService {
   private readonly logger = new Logger(StudyService.name);
@@ -55,6 +68,7 @@ export class StudyService {
   private async collectState(userId: string): Promise<{
     languages: LanguageState[];
     totalMinutes: number;
+    includeProduction: boolean;
   }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -101,13 +115,38 @@ export class StudyService {
       });
     }
 
-    return { languages, totalMinutes: user.dailyMinutes };
+    return {
+      languages,
+      totalMinutes: user.dailyMinutes,
+      includeProduction: await this.productionIsDue(userId),
+    };
+  }
+
+  /**
+   * Faz uma semana ou mais desde a ultima producao quadrupla?
+   *
+   * Conta a ATIVIDADE criada, e nao a concluida, de proposito: se ela fosse
+   * medida pela conclusao, um bloco pulado a traria de volta todo dia seguinte
+   * -- e o aluno que pulou uma vez por falta de tempo passaria a ve-la sempre,
+   * que e a forma mais rapida de transformar o bloco mais dificil do produto
+   * numa irritacao diaria.
+   */
+  private async productionIsDue(userId: string): Promise<boolean> {
+    const since = new Date();
+    since.setDate(since.getDate() - PRODUCTION_INTERVAL_DAYS);
+
+    const recent = await this.prisma.activity.findFirst({
+      where: { session: { userId }, type: 'production', createdAt: { gte: since } },
+      select: { id: true },
+    });
+
+    return recent === null;
   }
 
   private async createSession(userId: string, useAi: boolean) {
-    const { languages, totalMinutes } = await this.collectState(userId);
+    const { languages, totalMinutes, includeProduction } = await this.collectState(userId);
 
-    let plan = planSession(languages, totalMinutes);
+    let plan = planSession(languages, totalMinutes, { includeProduction });
 
     // A IA e refinamento opcional: se falhar, seguimos com o plano deterministico.
     if (useAi && this.ai.hasProvider()) {
@@ -175,7 +214,20 @@ export class StudyService {
       const planned = valid.reduce((sum, a) => sum + a.plannedMinutes, 0);
       const coversAll = languages.every((l) => valid.some((a) => a.languageCode === l.code));
 
-      if (valid.length === 0 || !coversAll || Math.abs(planned - totalMinutes) > 10) {
+      /*
+       * Estrutura e vocabulario sao regra do produto, nao preferencia do
+       * planejador -- o mesmo conceito nos quatro idiomas e a regra de frase de
+       * cada um. A IA e refinamento, e refinamento nao tem licenca para
+       * remover a promessa: um plano sem esses dois blocos em algum idioma cai
+       * inteiro para o deterministico, que os garante por construcao.
+       */
+      const keepsDaily = languages.every((l) =>
+        MANDATORY_TYPES.every((type) =>
+          valid.some((a) => a.languageCode === l.code && a.type === type),
+        ),
+      );
+
+      if (valid.length === 0 || !coversAll || !keepsDaily || Math.abs(planned - totalMinutes) > 10) {
         this.logger.warn('Plano da IA rejeitado pela validacao; usando o plano deterministico.');
         return fallback;
       }
@@ -410,10 +462,17 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   dictation: 'listening',
   reading: 'reading',
   writing: 'writing',
+  // Producao quadrupla e escrita livre, so que em quatro frentes ao mesmo
+  // tempo -- move a mesma competencia.
+  production: 'writing',
   speaking: 'speaking',
   tutor: 'speaking',
   vocabulary: 'vocabScore',
   review: 'vocabScore',
+  // Montar frase e gramatica aplicada -- e o mesmo campo que o mission engine
+  // usa para ranquear estrutura, senao o bloco melhoraria uma nota que ninguem
+  // consulta para decidir o dia seguinte.
+  structure: 'grammar',
   grammar: 'grammar',
 };
 

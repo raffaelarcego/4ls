@@ -5,6 +5,7 @@ import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SpeechModule } from './infrastructure/speech/speech.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ConceptsModule } from './modules/concepts/concepts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErrorsModule } from './modules/errors/errors.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
@@ -13,6 +14,7 @@ import { HealthModule } from './modules/health/health.module';
 import { LanguagesModule } from './modules/languages/languages.module';
 import { ReviewModule } from './modules/review/review.module';
 import { SpeechFeatureModule } from './modules/speech/speech.module';
+import { StructureModule } from './modules/structure/structure.module';
 import { StudyModule } from './modules/study/study.module';
 import { TutorModule } from './modules/tutor/tutor.module';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
@@ -27,6 +29,8 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     AuthModule,
     LanguagesModule,
     VocabularyModule,
+    ConceptsModule,
+    StructureModule,
     ReviewModule,
     ErrorsModule,
     GamificationModule,

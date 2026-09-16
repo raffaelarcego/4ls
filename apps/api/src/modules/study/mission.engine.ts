@@ -55,6 +55,9 @@ const MAX_BLOCK = 10;
 const PILLAR_BY_TYPE: Record<string, Pillar> = {
   review: Pillar.LEARN,
   vocabulary: Pillar.LEARN,
+  structure: Pillar.LEARN,
+  // Producao livre e uso real da lingua, nao treino de forma.
+  production: Pillar.LIVE,
   grammar: Pillar.LEARN,
   listening: Pillar.LISTEN,
   dictation: Pillar.LISTEN,
@@ -85,6 +88,8 @@ const ERROR_TO_TYPE: Record<string, string> = {
 /** Subcompetencia que governa a necessidade de cada tipo. */
 const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   vocabulary: 'vocabScore',
+  // Montar frase e gramatica aplicada: o dominio aparece ali.
+  structure: 'grammar',
   grammar: 'grammar',
   listening: 'listening',
   // Ditado depende de escuta, mas concorre em separado -- a penalidade de
@@ -101,10 +106,31 @@ export function pillarForType(type: string): Pillar {
   return PILLAR_BY_TYPE[type] ?? Pillar.LEARN;
 }
 
+/**
+ * Blocos que todo idioma recebe TODO dia, antes de qualquer ranqueamento.
+ *
+ * Nao sao os blocos mais "necessarios" pela pontuacao -- sao os dois que
+ * sustentam a promessa do produto, e por isso nao competem por vaga:
+ *
+ * - `structure` porque saber o significado da palavra nao ensina a montar a
+ *   frase. Sem ela o aluno junta palavras certas numa ordem que nenhum nativo
+ *   usaria, e isso nao melhora sozinho com mais vocabulario.
+ * - `vocabulary` porque e o bloco que entrega os conceitos do dia, e os
+ *   conceitos do dia sao os MESMOS nos quatro idiomas. Se um idioma ficar sem
+ *   ele, aquele idioma perde o conceito e a rede se rompe exatamente onde ela
+ *   deveria segurar.
+ *
+ * A ordem importa: estrutura antes de vocabulario, para o aluno ja receber as
+ * palavras novas sabendo onde encaixa-las.
+ */
+const DAILY_TYPES = ['structure', 'vocabulary'] as const;
+
 /** Tipos que podem ser iniciados avulso, pelo botao de pratica livre. */
 export const PRACTICABLE_TYPES = [
   'review',
+  'structure',
   'vocabulary',
+  'production',
   'grammar',
   'listening',
   'dictation',
@@ -114,13 +140,49 @@ export const PRACTICABLE_TYPES = [
   'tutor',
 ] as const;
 
-export function planSession(languages: LanguageState[], totalMinutes: number): MissionPlan {
+/**
+ * Minutos do bloco de producao quadrupla.
+ *
+ * Mais que um bloco comum porque ele e outra coisa: escrever a mesma frase em
+ * quatro idiomas, sem alternativa na tela, e o exercicio mais lento e mais
+ * caro do produto. Tambem e o unico que mede o que o resto so treina.
+ */
+const PRODUCTION_MINUTES = 8;
+
+export interface PlanOptions {
+  /**
+   * Inclui o bloco de producao quadrupla nesta sessao.
+   *
+   * Quem decide e o StudyService, olhando quando foi a ultima: semanal, nao
+   * diaria. Diaria cansaria e, pior, mediria memoria de curto prazo -- a
+   * producao livre so diz alguma coisa sobre conceitos que ja assentaram.
+   */
+  includeProduction?: boolean;
+}
+
+export function planSession(
+  languages: LanguageState[],
+  totalMinutes: number,
+  options: PlanOptions = {},
+): MissionPlan {
   const activities: PlannedActivity[] = [];
   const highlights: string[] = [];
 
+  /*
+   * A producao atravessa os idiomas, entao ela sai do total ANTES da divisao
+   * por idioma -- nao pertence a nenhum deles. O idioma prioritario entra so
+   * como dono nominal do bloco, porque toda atividade precisa de um.
+   */
+  const production =
+    options.includeProduction && languages.length >= 2 && totalMinutes >= PRODUCTION_MINUTES * 2
+      ? Math.min(PRODUCTION_MINUTES, Math.floor(totalMinutes * 0.2))
+      : 0;
+
+  const budget = totalMinutes - production;
+
   // O tempo declarado por idioma e normalizado para bater com o total real.
   const declared = languages.reduce((sum, l) => sum + l.minutesPerDay, 0) || 1;
-  const scale = totalMinutes / declared;
+  const scale = budget / declared;
 
   for (const language of languages) {
     const minutes = Math.round(language.minutesPerDay * scale);
@@ -131,11 +193,25 @@ export function planSession(languages: LanguageState[], totalMinutes: number): M
     if (highlight) highlights.push(highlight);
   }
 
+  if (production > 0) {
+    // No fim da sessao de proposito: producao livre exige o aquecimento que os
+    // blocos anteriores deram, e falha feio como primeira tarefa do dia.
+    activities.push({
+      languageCode: languages[0].code,
+      pillar: Pillar.LIVE,
+      type: 'production',
+      plannedMinutes: production,
+      reason: 'Dizer a mesma coisa nos quatro idiomas, sem alternativa na tela.',
+    });
+  }
+
+  const base = highlights.length
+    ? `Os mesmos conceitos em todos os idiomas, cada um com a sua regra de frase. Foco extra: ${highlights.join('; ')}.`
+    : 'Os mesmos conceitos em todos os idiomas, cada um com a sua regra de frase.';
+
   return {
     totalMinutes: activities.reduce((sum, a) => sum + a.plannedMinutes, 0),
-    rationale: highlights.length
-      ? `Foco de hoje: ${highlights.join('; ')}.`
-      : 'Sessao equilibrada entre os tres idiomas.',
+    rationale: production > 0 ? `${base} Hoje tem producao quadrupla.` : base,
     activities,
   };
 }
@@ -148,13 +224,22 @@ function planLanguage(
   let remaining = minutes;
   let highlight: string | null = null;
 
-  // 1. Revisao vencida sempre vem primeiro -- e o que trava a progressao.
-  if (language.dueReviews > 0) {
-    // ~30s por item, entre MIN_BLOCK e 40% do tempo do idioma.
-    const reviewMinutes = clamp(
-      Math.ceil(language.dueReviews * 0.5),
-      MIN_BLOCK,
-      Math.max(MIN_BLOCK, Math.floor(minutes * 0.4)),
+  // Os blocos obrigatorios tem a vaga garantida, entao o resto do plano nao
+  // pode gastar o tempo deles. Reservar aqui e o que impede uma revisao enorme
+  // de engolir a aula de estrutura do dia.
+  const reserved = MIN_BLOCK * DAILY_TYPES.length;
+
+  // 1. Revisao vencida vem primeiro -- e o que trava a progressao.
+  if (language.dueReviews > 0 && remaining - reserved >= MIN_BLOCK) {
+    // ~30s por item, entre MIN_BLOCK e 40% do tempo do idioma, e nunca
+    // avancando sobre o que os blocos obrigatorios ainda vao precisar.
+    const reviewMinutes = Math.min(
+      clamp(
+        Math.ceil(language.dueReviews * 0.5),
+        MIN_BLOCK,
+        Math.max(MIN_BLOCK, Math.floor(minutes * 0.4)),
+      ),
+      remaining - reserved,
     );
     blocks.push({
       languageCode: language.code,
@@ -166,7 +251,29 @@ function planLanguage(
     remaining -= reviewMinutes;
   }
 
-  // 2. O tempo restante vai para os tipos com maior necessidade.
+  // 2. Os dois blocos do dia, sem passar pelo ranqueamento.
+  DAILY_TYPES.forEach((type, index) => {
+    if (remaining < MIN_BLOCK) return;
+
+    // O que os obrigatorios seguintes ainda vao precisar.
+    const stillReserved = MIN_BLOCK * (DAILY_TYPES.length - index - 1);
+    const blockMinutes = Math.min(
+      MAX_BLOCK,
+      Math.max(MIN_BLOCK, remaining - stillReserved),
+      Math.max(MIN_BLOCK, Math.round(minutes * 0.2)),
+    );
+
+    blocks.push({
+      languageCode: language.code,
+      pillar: PILLAR_BY_TYPE[type] ?? Pillar.LEARN,
+      type,
+      plannedMinutes: blockMinutes,
+      reason: DAILY_REASON[type],
+    });
+    remaining -= blockMinutes;
+  });
+
+  // 3. O tempo restante vai para os tipos com maior necessidade.
   const ranked = rankTypes(language);
 
   for (const candidate of ranked) {
@@ -185,13 +292,19 @@ function planLanguage(
     if (!highlight) highlight = `${language.name} em ${candidate.type}`;
   }
 
-  // 3. Sobra pequena volta para o primeiro bloco, para fechar o tempo exato.
+  // 4. Sobra pequena volta para o primeiro bloco, para fechar o tempo exato.
   if (remaining > 0 && blocks.length > 0) {
     blocks[0].plannedMinutes += remaining;
   }
 
   return { blocks, highlight };
 }
+
+/** Por que cada bloco obrigatorio esta ali -- a sessao sempre se explica. */
+const DAILY_REASON: Record<(typeof DAILY_TYPES)[number], string> = {
+  structure: 'Como este idioma monta a frase. Saber a palavra nao basta para dizer a frase.',
+  vocabulary: 'Os conceitos de hoje, os mesmos que voce ve nos outros idiomas.',
+};
 
 interface RankedType {
   type: string;
@@ -204,7 +317,11 @@ interface RankedType {
  * Tres forcas: fraqueza da competencia, erros recorrentes e variedade.
  */
 function rankTypes(language: LanguageState): RankedType[] {
-  const candidates = Object.keys(SKILL_BY_TYPE);
+  // Os obrigatorios ja entraram: deixa-los concorrer de novo duplicaria o
+  // bloco e ainda tiraria a vaga de uma competencia nao atendida hoje.
+  const candidates = Object.keys(SKILL_BY_TYPE).filter(
+    (type) => !DAILY_TYPES.includes(type as (typeof DAILY_TYPES)[number]),
+  );
 
   const ranked = candidates.map<RankedType>((type) => {
     const skill = SKILL_BY_TYPE[type];

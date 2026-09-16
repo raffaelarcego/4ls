@@ -24,6 +24,7 @@ interface CorrectionResult {
     description: string;
     explanation?: string;
     severity?: number;
+    sourceLanguage?: string | null;
   }>;
 }
 
@@ -104,9 +105,18 @@ export class TutorService {
       throw new NotFoundException(`Voce nao esta estudando o idioma "${languageCode}".`);
     }
 
-    const [recentErrors, recentVocabulary] = await Promise.all([
+    const [recentErrors, recentVocabulary, others] = await Promise.all([
       this.errors.summaryForPrompt(userId, languageCode),
       this.vocabulary.recentTerms(userId, languageCode),
+      // Os outros idiomas entram no contexto para o modelo poder NOMEAR a
+      // origem de um erro de interferencia. Sem esta lista ele so consegue
+      // dizer que a frase esta errada, nunca de onde veio o erro -- e "de onde
+      // veio" e o unico dado que um app de idioma solto nao tem como produzir.
+      this.prisma.userLanguage.findMany({
+        where: { userId, language: { code: { not: languageCode } } },
+        include: { language: true },
+        orderBy: { priority: 'asc' },
+      }),
     ]);
 
     return {
@@ -115,6 +125,11 @@ export class TutorService {
       level: userLanguage.currentLevel,
       recentErrors,
       recentVocabulary,
+      otherLanguages: others.map((ul) => ({
+        code: ul.language.code,
+        name: ul.language.name,
+        level: ul.currentLevel,
+      })),
     };
   }
 
@@ -220,6 +235,9 @@ export class TutorService {
           description: e.description,
           explanation: e.explanation,
           severity: e.severity,
+          // A origem da interferencia vem junto: e o dado que so este produto
+          // tem, porque so ele sabe quais sao os outros idiomas do aluno.
+          sourceLanguage: e.sourceLanguage,
         })),
         { source: 'tutor', userText: input.content, correctedText: correction.corrected },
       );
@@ -282,6 +300,7 @@ export class TutorService {
         description: string;
         explanation?: string;
         severity?: number;
+        sourceLanguage?: string | null;
       }>;
     }>({
       task: 'writing.correct',
@@ -302,6 +321,9 @@ export class TutorService {
           description: e.description,
           explanation: e.explanation,
           severity: e.severity,
+          // A origem da interferencia vem junto: e o dado que so este produto
+          // tem, porque so ele sabe quais sao os outros idiomas do aluno.
+          sourceLanguage: e.sourceLanguage,
         })),
         { source: 'writing', userText: input.text, correctedText: result.corrected },
       );
@@ -459,6 +481,7 @@ export class TutorService {
         description: string;
         explanation?: string;
         severity?: number;
+        sourceLanguage?: string | null;
       }>;
     }>({
       task: 'speaking.evaluate',
@@ -479,6 +502,9 @@ export class TutorService {
           description: e.description,
           explanation: e.explanation,
           severity: e.severity,
+          // A origem da interferencia vem junto: e o dado que so este produto
+          // tem, porque so ele sabe quais sao os outros idiomas do aluno.
+          sourceLanguage: e.sourceLanguage,
         })),
         { source: 'speaking', userText: input.transcript, correctedText: result.corrected },
       );

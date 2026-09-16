@@ -1,4 +1,4 @@
-export type Lang = 'pt' | 'en' | 'es' | 'de';
+export type Lang = 'pt' | 'en' | 'es' | 'de' | 'ru';
 
 export interface TopicSummary {
   id: string;

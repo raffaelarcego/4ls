@@ -85,6 +85,10 @@ export class MimoSpeechProvider implements SpeechProvider {
         'MIMO_ACCENT_DE',
         'Sprich Deutsch wie ein Muttersprachler, mit natürlichem Hochdeutsch: klares gerolltes bzw. uvulares R, korrekte Umlaute (ä, ö, ü), harte Endkonsonanten und der Ich-Laut in „ich". Verwende auf keinen Fall eine englische Aussprache.',
       ),
+      ru: config.get<string>(
+        'MIMO_ACCENT_RU',
+        'Говори по-русски как носитель языка, с естественным московским произношением: аканье в безударных слогах, мягкие и твёрдые согласные, оглушение звонких согласных в конце слова. Ни в коем случае не используй английское произношение.',
+      ),
       pt: config.get<string>(
         'MIMO_ACCENT_PT',
         'Fale em português do Brasil como falante nativo, com sotaque brasileiro natural e neutro.',
@@ -97,6 +101,7 @@ export class MimoSpeechProvider implements SpeechProvider {
       en: config.get<string>('MIMO_VOICE_EN', 'Mia'),
       es: config.get<string>('MIMO_VOICE_ES', 'Chloe'),
       de: config.get<string>('MIMO_VOICE_DE', 'Dean'),
+      ru: config.get<string>('MIMO_VOICE_RU', 'Emma'),
     };
 
     /*

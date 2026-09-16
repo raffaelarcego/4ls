@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { VocabStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { ConceptsService } from '../concepts/concepts.service';
 import { review, ReviewGrade } from './srs.engine';
 
 const REVIEW_XP = 10;
 
 @Injectable()
 export class ReviewService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly concepts: ConceptsService,
+  ) {}
 
   /** Itens vencidos, opcionalmente filtrados por idioma. */
   async due(userId: string, languageCode?: string, limit = 20) {
@@ -23,7 +27,29 @@ export class ReviewService {
       take: limit,
     });
 
-    return items.map((item) => ({
+    /*
+     * Cada card vencido vem com o ANDAIME, quando ele cabe: a mesma coisa no
+     * idioma em que o aluno ja e firme.
+     *
+     * E a diferenca pratica que o progresso por conceito trouxe. Antes, errar
+     * "работа" e errar um termo russo nunca visto chegavam iguais a tela, e as
+     * duas recebiam o mesmo tratamento -- reapresentar o significado. Agora,
+     * quando o significado ja firmou em outro idioma, a revisao para de
+     * reensinar o conceito e passa a treinar so o que falta: puxar a forma.
+     */
+    const scaffolds = await Promise.all(
+      items.map((item) =>
+        item.vocabulary.conceptId
+          ? this.concepts.scaffold(
+              userId,
+              item.vocabulary.conceptId,
+              item.vocabulary.language.code,
+            )
+          : Promise.resolve(null),
+      ),
+    );
+
+    return items.map((item, index) => ({
       id: item.id,
       status: item.status,
       confidence: item.confidence,
@@ -34,6 +60,9 @@ export class ReviewService {
       level: item.vocabulary.level,
       languageCode: item.vocabulary.language.code,
       languageName: item.vocabulary.language.name,
+      conceptId: item.vocabulary.conceptId,
+      /** A mesma coisa num idioma que ele domina, ou null. */
+      scaffold: scaffolds[index],
     }));
   }
 
@@ -91,6 +120,19 @@ export class ReviewService {
       },
     });
 
+    // O conceito acompanha o card: e esta linha que alimenta a distincao entre
+    // "nao sei o significado" e "nao lembro a forma".
+    let meaningStrength: number | null = null;
+    if (item.vocabulary.conceptId) {
+      const progress = await this.concepts.recordReview(
+        userId,
+        item.vocabulary.conceptId,
+        item.vocabulary.languageId,
+        grade !== 'again',
+      );
+      meaningStrength = Math.round(progress.meaningStrength * 100);
+    }
+
     // Errar repetidamente vira um dado de Error Intelligence.
     if (grade === 'again' && updated.wrongCount >= 3) {
       await this.recordVocabularyStruggle(userId, item.vocabularyId, item.vocabulary.term);
@@ -102,6 +144,12 @@ export class ReviewService {
       nextReview: updated.nextReview,
       intervalDays: updated.intervalDays,
       confidence: updated.confidence,
+      /**
+       * 0-100 do conceito, nao deste card. Alto com o card errado significa que
+       * o aluno sabe o que a palavra quer dizer e travou na forma -- e e isso
+       * que a tela avisa em vez de dizer so "errou".
+       */
+      meaningStrength,
       xpEarned: grade === 'again' ? 0 : REVIEW_XP,
     };
   }

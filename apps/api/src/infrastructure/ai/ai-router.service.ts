@@ -69,20 +69,64 @@ export class AiRouterService {
       );
     }
 
+    return this.run(input, providers, (response) => response);
+  }
+
+  /**
+   * Igual a chat(), mas garante um objeto JSON de volta.
+   *
+   * O parse acontece DENTRO da volta de providers, e nao depois dela, e essa e
+   * a diferenca que importa: resposta ilegivel conta como falha do provider e
+   * a cadeia segue para o proximo.
+   *
+   * Isto custou um bug real. A MiMo devolveu JSON cortado no meio -- nao um
+   * erro de rede, uma resposta 200 com conteudo parcial --, o router deu por
+   * bem-sucedida e o bloco de estrutura estourou na cara do aluno, com o
+   * OpenRouter ali do lado perfeitamente capaz de responder. Provider que
+   * entrega JSON quebrado falhou, mesmo tendo respondido.
+   */
+  async chatJson<T>(input: AiChatInput): Promise<T> {
+    const json = { ...input, json: true };
+    const providers = this.chainFor(json.task);
+
+    if (providers.length === 0) {
+      throw new ServiceUnavailableException(
+        'Nenhum provider de IA configurado. Defina MIMO_API_KEY ou OPENROUTER_API_KEY no .env do backend.',
+      );
+    }
+
+    return this.run(json, providers, (response) => parseJsonResponse<T>(response.content));
+  }
+
+  /**
+   * Percorre a cadeia ate alguem entregar uma resposta que `accept` aprove.
+   *
+   * `accept` pode lancar: e assim que "respondeu, mas a resposta nao serve"
+   * entra na mesma contabilidade de falha que "nao respondeu". As duas viram
+   * linha em ai_call_logs, porque as duas custaram dinheiro e latencia.
+   */
+  private async run<T>(
+    input: AiChatInput,
+    providers: AiProvider[],
+    accept: (response: AiChatResponse) => T,
+  ): Promise<T> {
     const failures: string[] = [];
 
     for (const provider of providers) {
+      let response: AiChatResponse | null = null;
+
       try {
-        const response = await provider.chat(input);
+        response = await provider.chat(input);
+        const value = accept(response);
         await this.log(input, response, true, null);
-        return response;
+        return value;
       } catch (err) {
         const message = (err as Error).message;
-        failures.push(message);
+        failures.push(`${provider.name}: ${message}`);
         this.logger.warn(`Provider ${provider.name} falhou na tarefa ${input.task}: ${message}`);
         await this.log(
           input,
-          { provider: provider.name, model: provider.modelFor(input.task) },
+          response ?? { provider: provider.name, model: provider.modelFor(input.task) },
           false,
           message,
         );
@@ -92,15 +136,6 @@ export class AiRouterService {
     throw new ServiceUnavailableException(
       `Todos os providers de IA falharam. Detalhes: ${failures.join(' | ')}`,
     );
-  }
-
-  /**
-   * Igual a chat(), mas garante um objeto JSON de volta. Modelos as vezes
-   * embrulham o JSON em blocos markdown, entao limpamos antes do parse.
-   */
-  async chatJson<T>(input: AiChatInput): Promise<T> {
-    const response = await this.chat({ ...input, json: true });
-    return parseJsonResponse<T>(response.content);
   }
 
   private async log(
@@ -149,10 +184,53 @@ export function parseJsonResponse<T>(raw: string): T {
     const start = text.search(/[{[]/);
     const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
     if (start !== -1 && end > start) {
-      return JSON.parse(text.slice(start, end + 1)) as T;
+      try {
+        return JSON.parse(text.slice(start, end + 1)) as T;
+      } catch {
+        // Cai para o diagnostico abaixo em vez de propagar o erro de sintaxe.
+      }
     }
+
+    /*
+     * Resposta truncada tem um diagnostico proprio porque o sintoma engana.
+     * Quando o modelo bate no teto de tokens, o JSON para no meio de uma
+     * string e o parser reclama de virgula ou chave faltando -- e quem le o
+     * erro vai procurar defeito no prompt, que esta perfeito. O que falta e
+     * `maxTokens`, e isso a mensagem tem de dizer.
+     */
+    if (looksTruncated(text)) {
+      throw new Error(
+        `Resposta da IA veio truncada (${text.length} caracteres, JSON nao fechado). ` +
+          'Aumente maxTokens nesta chamada.',
+      );
+    }
+
     throw new Error(`Resposta da IA nao e JSON valido: ${raw.slice(0, 200)}`);
   }
+}
+
+/** JSON que abriu e nunca fechou -- assinatura de resposta cortada no teto. */
+function looksTruncated(text: string): boolean {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') inString = !inString;
+    if (inString) continue;
+    if (char === '{' || char === '[') depth += 1;
+    if (char === '}' || char === ']') depth -= 1;
+  }
+
+  return inString || depth > 0;
 }
 
 /** Estimativa grosseira em USD, so para ranquear custo entre modelos. */

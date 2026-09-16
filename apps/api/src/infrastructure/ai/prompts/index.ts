@@ -12,12 +12,21 @@ export interface LearnerContext {
   recentErrors: string[];
   recentVocabulary: string[];
   topic?: string;
+  /**
+   * Os outros idiomas que o aluno estuda, com o nivel dele em cada um.
+   *
+   * Nao e enfeite de contexto: e o que permite ao modelo NOMEAR a origem de um
+   * erro de interferencia. Sem esta lista, "Ich sehe der Mann" e so um erro de
+   * caso; com ela, da para dizer que veio do portugues, que nao marca o objeto.
+   */
+  otherLanguages?: Array<{ code: string; name: string; level: string }>;
 }
 
 const LANGUAGE_LABEL: Record<string, string> = {
   en: 'ingles',
   es: 'espanhol',
   de: 'alemao',
+  ru: 'russo',
 };
 
 function contextBlock(ctx: LearnerContext): string {
@@ -32,7 +41,39 @@ function contextBlock(ctx: LearnerContext): string {
   if (ctx.recentVocabulary.length) {
     lines.push(`VOCABULARIO EM APRENDIZADO: ${ctx.recentVocabulary.join(', ')}`);
   }
+  if (ctx.otherLanguages?.length) {
+    lines.push(
+      `OUTROS IDIOMAS QUE ELE ESTUDA AO MESMO TEMPO: ${ctx.otherLanguages
+        .map((l) => `${l.name} (${l.code}, ${l.level})`)
+        .join(', ')}`,
+    );
+  }
   return lines.join('\n');
+}
+
+/**
+ * O bloco que ensina o modelo a acusar interferencia.
+ *
+ * Entra em todo prompt que extrai erro. A instrucao e deliberadamente
+ * conservadora -- "so quando a interferencia for a explicacao mais provavel" --
+ * porque um palpite de origem e pior que origem nenhuma: ele mandaria o aluno
+ * estudar um contraste entre idiomas que nunca causou problema nenhum a ele.
+ */
+function interferenceBlock(ctx: LearnerContext): string {
+  if (!ctx.otherLanguages?.length) return '';
+
+  const codes = ctx.otherLanguages.map((l) => l.code).join('", "');
+
+  return `
+INTERFERENCIA ENTRE IDIOMAS
+Este aluno estuda varios idiomas ao mesmo tempo, e boa parte dos erros dele nao vem
+de ignorancia: vem de importar a regra de outra lingua que ele tambem estuda.
+Para CADA erro, preencha "sourceLanguage" com o codigo do idioma de onde a
+interferencia veio -- "pt" para a lingua materna, ou um de "${codes}".
+Use null quando o erro nao for de interferencia (descuido, forma nunca ensinada,
+lapso). Nao chute: so nomeie a origem quando a interferencia for de fato a
+explicacao mais provavel, e diga em "explanation" qual construcao do outro idioma
+produziu o erro.`;
 }
 
 /** Tutor conversacional por idioma. */
@@ -55,6 +96,9 @@ REGRAS
 export function correctionPrompt(ctx: LearnerContext, text: string): string {
   return `Analise a frase abaixo, escrita por um aluno de ${ctx.languageName} no nivel ${ctx.level}.
 
+${contextBlock(ctx)}
+${interferenceBlock(ctx)}
+
 FRASE DO ALUNO:
 """${text}"""
 
@@ -67,6 +111,7 @@ Responda APENAS com JSON valido neste formato:
       "category": "VOCABULARY|GRAMMAR|PRONUNCIATION|WORD_ORDER|ARTICLE|TENSE|PREPOSITION|FALSE_COGNATE|SPELLING|COMPREHENSION",
       "description": "descricao curta do erro, em portugues",
       "explanation": "por que esta errado e qual a regra, em portugues",
+      "sourceLanguage": null,
       "severity": 1
     }
   ]
@@ -103,6 +148,9 @@ Para type "fill_blank" e "translate", deixe "options" como lista vazia.`;
 export function writingPrompt(ctx: LearnerContext, mission: string, text: string): string {
   return `Avalie o texto de um aluno de ${ctx.languageName} nivel ${ctx.level}.
 
+${contextBlock(ctx)}
+${interferenceBlock(ctx)}
+
 MISSAO DADA AO ALUNO: ${mission}
 
 TEXTO DO ALUNO:
@@ -114,7 +162,7 @@ Responda APENAS com JSON valido:
   "corrected": "versao corrigida do texto",
   "feedback": "2 a 4 frases de feedback em portugues",
   "topErrors": [
-    { "category": "GRAMMAR", "description": "...", "explanation": "...", "severity": 2 }
+    { "category": "GRAMMAR", "description": "...", "explanation": "...", "sourceLanguage": null, "severity": 2 }
   ]
 }
 Cada score vai de 0 a 100. Liste no maximo 3 erros em topErrors, do mais grave ao menos grave.`;
@@ -131,6 +179,10 @@ Regras:
 - Respeite exatamente o total de minutos disponivel e os minutos por idioma.
 - Cada bloco tem no minimo 3 e no maximo 10 minutos.
 - Sempre comece cada idioma por revisao (pillar LEARN, type "review") se houver itens vencidos.
+- OBRIGATORIO: todo idioma recebe um bloco "structure" (formacao de frase) e um bloco
+  "vocabulary" hoje. Sao os dois blocos que sustentam a promessa do produto -- o mesmo
+  conceito aprendido nos quatro idiomas, e a regra de montagem da frase de cada um.
+  Um plano sem esses dois blocos em algum idioma sera descartado.
 - Priorize as fraquezas: as subcompetencias com nota mais baixa e os erros recorrentes.
 - Varie em relacao as atividades recentes -- a sessao de hoje nao deve ser igual a de ontem.
 
@@ -139,9 +191,9 @@ Responda APENAS com JSON valido:
   "rationale": "1 a 2 frases em portugues explicando as escolhas de hoje",
   "activities": [
     {
-      "languageCode": "en|es|de",
+      "languageCode": "en|es|de|ru",
       "pillar": "LISTEN|LEARN|LIVE|LEVEL_UP",
-      "type": "review|vocabulary|grammar|listening|reading|speaking|writing|tutor",
+      "type": "review|structure|vocabulary|grammar|listening|reading|speaking|writing|tutor",
       "plannedMinutes": 5,
       "reason": "por que esta atividade foi escolhida, em portugues"
     }
@@ -248,6 +300,8 @@ export function speakingPrompt(ctx: LearnerContext, mission: string, transcript:
 
 ${contextBlock(ctx)}
 
+${interferenceBlock(ctx)}
+
 MISSAO DADA AO ALUNO: ${mission}
 
 TRANSCRICAO AUTOMATICA DA FALA:
@@ -264,7 +318,7 @@ Responda APENAS com JSON valido:
   "corrected": "como um nativo diria o mesmo conteudo",
   "feedback": "2 a 4 frases de feedback em portugues",
   "topErrors": [
-    { "category": "GRAMMAR", "description": "...", "explanation": "...", "severity": 2 }
+    { "category": "GRAMMAR", "description": "...", "explanation": "...", "sourceLanguage": null, "severity": 2 }
   ]
 }
 Cada score vai de 0 a 100. Liste no maximo 3 erros em topErrors, do mais grave ao menos grave.`;
@@ -316,7 +370,7 @@ O ${ctx.contrastName} se comporta de forma diferente: use-o para marcar o CONTRA
 Use o ${ctx.contrastName} para marcar o contraste e deixe claro que o ${ctx.targetName} esta sozinho.`;
 
   return `Voce escreve exercicios de gramatica contrastiva para um brasileiro que estuda
-ingles, espanhol e alemao AO MESMO TEMPO. Ele fala portugues nativo.
+ingles, espanhol, alemao e russo AO MESMO TEMPO. Ele fala portugues nativo.
 
 O objetivo do exercicio nao e testar uma regra isolada: e fazer o aluno PERCEBER a diferenca
 entre os idiomas, comparando a mesma frase lado a lado.
@@ -348,7 +402,7 @@ marcada por ___ (tres sublinhados). O aluno ve as outras versoes e deduz a do al
   comparando com ele que o aluno deduz a resposta. Nunca mostre o idioma alvo em "shown".
 
 TIPO "trap": uma frase ERRADA no idioma alvo, do tipo que um brasileiro que tambem
-estuda os outros dois idiomas realmente escreveria por interferencia. O aluno corrige.
+estuda os outros tres idiomas realmente escreveria por interferencia. O aluno corrige.
 
   REGRA CRITICA do trap: "sentence" tem de estar mesmo ERRADA e ser DIFERENTE de
   "answer". Se voce nao consegue pensar num erro plausivel, escreva um exercicio
@@ -389,5 +443,376 @@ Responda APENAS com JSON valido:
     }
   ]
 }
-Use apenas os codigos "pt", "en", "es", "de" no campo "lang".`;
+Use apenas os codigos "pt", "en", "es", "de", "ru" no campo "lang".`;
+}
+
+// ---------------------------------------------------------------------------
+// Conceitos atravessando os idiomas
+// ---------------------------------------------------------------------------
+
+export interface ConceptContext {
+  /** Como o conceito se le em portugues, ex.: "o trabalho". */
+  gloss: string;
+  /** O que ja se sabe sobre o conceito, em portugues. */
+  note?: string | null;
+  /** Realizacoes que ja existem, para o modelo nao contradizer o que ha. */
+  known: Array<{ languageCode: string; term: string; example: string | null }>;
+}
+
+/**
+ * Um idioma que falta, COM o nivel do aluno naquele idioma.
+ *
+ * O nivel e por idioma, e nao por conceito, de proposito. Quem e B2 em ingles e
+ * A1 em russo nao pode receber a frase russa no registro do exemplo ingles:
+ * seria conteudo correto e inutil. O conceito e o mesmo; a frase que o carrega
+ * tem de caber em quem vai le-la.
+ */
+export interface ConceptTarget {
+  code: string;
+  name: string;
+  level: string;
+}
+
+/**
+ * Completa um conceito nos idiomas que faltam.
+ *
+ * Este prompt e o que sustenta a regra central do produto: o aluno nunca
+ * aprende uma palavra em um idioma so. Quando um termo novo entra por qualquer
+ * porta -- vocabulario do listening, palavra salva a mao, sugestao do tutor --,
+ * e aqui que ele ganha as irmas nos outros idiomas antes de virar card.
+ *
+ * As realizacoes ja existentes entram como CONTEXTO, nao como pedido de
+ * traducao literal: o que tem de bater e o SENTIDO. "sich lohnen" e a resposta
+ * certa para "valer a pena" justamente por nao ser palavra a palavra.
+ */
+export function conceptTranslationPrompt(ctx: ConceptContext, targets: ConceptTarget[]): string {
+  const known = ctx.known.length
+    ? ctx.known
+        .map(
+          (k) =>
+            `- ${LANGUAGE_LABEL[k.languageCode] ?? k.languageCode}: ${k.term}${
+              k.example ? ` ("${k.example}")` : ''
+            }`,
+        )
+        .join('\n')
+    : '(nenhuma ainda)';
+
+  const wanted = targets
+    .map((t) => `${t.code} (${LANGUAGE_LABEL[t.code] ?? t.name}, nivel ${t.level})`)
+    .join(', ');
+
+  return `Voce monta o vocabulario de um brasileiro que estuda ingles, espanhol, alemao e russo
+AO MESMO TEMPO. Ele fala portugues nativo.
+
+A unidade de estudo dele nao e a palavra, e o CONCEITO: o mesmo significado entra nos quatro
+idiomas no mesmo dia, para que a memoria de um sustente a dos outros.
+
+CONCEITO (em portugues): ${ctx.gloss}
+${ctx.note ? `OBSERVACAO: ${ctx.note}\n` : ''}
+COMO O CONCEITO JA FOI REALIZADO:
+${known}
+
+Escreva a realizacao deste MESMO conceito em: ${wanted}.
+
+O NIVEL E POR IDIOMA, e vai declarado acima em cada um. Este aluno esta em pontos
+diferentes de cada lingua: a frase de exemplo tem de caber no nivel DAQUELE idioma, e
+nao no nivel do conceito. A frase russa de A1 e curta e direta mesmo quando o exemplo
+ingles do mesmo conceito e sofisticado -- o conceito e o mesmo, o registro nao.
+
+Regras:
+- Traduza o SENTIDO, nao as palavras. Se o idioma resolve o conceito com outra construcao
+  (reflexivo, verbo diferente, caso diferente), use a construcao natural do idioma.
+- Se um idioma nao tiver equivalente de uma palavra so, use a expressao curta que um nativo
+  usaria de verdade. Nunca invente palavra nem traduza literalmente ao custo da naturalidade.
+- "term" e a forma de dicionario: substantivo com artigo quando o idioma tem artigo, verbo no
+  infinitivo. Em russo escreva em cirilico e ponha a transliteracao no "meaning".
+- "meaning" e em portugues, e deve avisar quando a construcao muda (caso exigido, reflexivo,
+  preposicao obrigatoria, falso cognato).
+- "example" e uma frase curta e cotidiana no nivel DECLARADO daquele idioma, usando o termo.
+- "translation" e a traducao do exemplo para o portugues.
+- As frases de exemplo dos varios idiomas devem dizer A MESMA COISA: e comparando-as lado a
+  lado que o aluno percebe a diferenca de estrutura entre as linguas.
+
+Responda APENAS com JSON valido:
+{
+  "entries": [
+    {
+      "languageCode": "${targets[0]?.code ?? 'en'}",
+      "term": "a forma de dicionario",
+      "meaning": "o significado em portugues, com o aviso de construcao se houver",
+      "example": "a frase de exemplo no idioma",
+      "translation": "a traducao da frase para o portugues"
+    }
+  ]
+}`;
+}
+
+// ---------------------------------------------------------------------------
+// Formacao de frase
+// ---------------------------------------------------------------------------
+
+export interface SentencePatternContext {
+  languageName: string;
+  languageCode: string;
+  level: string;
+  /** Padrao pedido, vindo do catalogo do codigo -- a IA nao escolhe o assunto. */
+  patternTitle: string;
+  patternQuestion: string;
+  /** O que o padrao ensina, ja escrito por nos. A IA nao contradiz. */
+  patternBehavior: string;
+  /** Como os outros idiomas do aluno resolvem o mesmo ponto. */
+  contrast: string;
+  /** Termos que o aluno esta aprendendo hoje, para as frases nao serem avulsas. */
+  terms: string[];
+  recentErrors: string[];
+}
+
+/**
+ * Aula de formacao de frase.
+ *
+ * Saber o que "Arbeit" significa nao ensina a dizer "amanha de manha eu vou
+ * para o trabalho de onibus": cada idioma monta a frase com uma ordem, uma
+ * marcacao e umas obrigacoes proprias. Este prompt produz a aula que faltava --
+ * formula, passos, exemplos DESMONTADOS peca a peca e exercicios de montagem.
+ *
+ * Duas decisoes deliberadas:
+ *
+ * 1. O padrao vem do catalogo do codigo, nao do modelo. Assunto e regra sao
+ *    nossos; a IA escreve as frases em cima deles. Gramatica errada e o unico
+ *    erro deste modulo que o aluno leva para a vida.
+ *
+ * 2. Todo exemplo vem fatiado em constituintes rotulados. E a fatia que ensina:
+ *    ver "Heute | gehe | ich | ins Kino" com o rotulo de cada peca ensina a
+ *    regra de posicao muito melhor do que le-la enunciada.
+ */
+export function sentencePatternPrompt(ctx: SentencePatternContext, drills: number): string {
+  return `Voce escreve a aula de FORMACAO DE FRASE em ${ctx.languageName} para um brasileiro
+que estuda ingles, espanhol, alemao e russo ao mesmo tempo. Ele fala portugues nativo e esta
+no nivel ${ctx.level}.
+
+O aluno ja aprende o significado das palavras em outro bloco. O que falta -- e o que esta aula
+resolve -- e COMO MONTAR A FRASE neste idioma: ordem das pecas, o que e obrigatorio, o que muda
+de forma e onde o portugues o trai.
+
+PADRAO A ENSINAR: ${ctx.patternTitle}
+DUVIDA DO ALUNO: ${ctx.patternQuestion}
+
+COMO ESTE IDIOMA RESOLVE ISTO (fato estabelecido, NAO contradiga):
+${ctx.patternBehavior}
+
+COMO OS OUTROS IDIOMAS DELE RESOLVEM O MESMO PONTO:
+${ctx.contrast}
+${
+    ctx.terms.length
+      ? `\nPALAVRAS QUE ELE ESTA APRENDENDO HOJE (use nas frases quando couber naturalmente):\n${ctx.terms.join(', ')}`
+      : ''
+  }${
+    ctx.recentErrors.length
+      ? `\nERROS RECORRENTES DELE:\n${ctx.recentErrors.map((e) => `- ${e}`).join('\n')}`
+      : ''
+  }
+
+Regras:
+- Tudo que explica vai em portugues. So as frases de exemplo ficam em ${ctx.languageName}.
+- "formula" e a regra em uma linha, com as pecas na ordem, ex.: "Sujeito + verbo (2a posicao) + resto".
+- "steps": 3 a 5 passos de montagem, na ordem em que o aluno deve pensar. Cada passo em uma linha.
+- "examples": 3 frases curtas e cotidianas no nivel ${ctx.level}. Cada uma vem DESMONTADA em
+  "parts": cada parte com o texto exato e o rotulo da funcao ("sujeito", "verbo conjugado",
+  "complemento no acusativo", "particula separavel"...). Juntar as parts na ordem, separadas por
+  espaco, tem de devolver a frase inteira.
+- "pitfalls": 2 a 3 erros que um brasileiro comete NESTE padrao, com a versao errada, a certa e o porque.
+- "drills": ${drills} exercicios de montagem. Em cada um, "scrambled" traz as pecas da frase
+  fora de ordem e "answer" e a frase correta montada. As pecas de "scrambled" tem de ser
+  exatamente as mesmas de "answer", so que embaralhadas -- nem uma peca a mais nem a menos.
+- Nenhuma frase pode repetir outra da mesma aula.
+
+Responda APENAS com JSON valido:
+{
+  "title": "titulo curto da aula, em portugues",
+  "formula": "a regra em uma linha",
+  "explanation": "2 a 4 frases em portugues explicando a logica do padrao",
+  "steps": ["passo 1", "passo 2", "passo 3"],
+  "examples": [
+    {
+      "sentence": "a frase completa em ${ctx.languageName}",
+      "translation": "a traducao em portugues",
+      "parts": [{ "text": "peca da frase", "role": "funcao da peca, em portugues" }],
+      "note": "o que esta frase mostra do padrao, em uma linha"
+    }
+  ],
+  "pitfalls": [
+    { "wrong": "a frase errada", "right": "a frase certa", "why": "a explicacao em portugues" }
+  ],
+  "drills": [
+    {
+      "gloss": "o que a frase quer dizer, em portugues",
+      "scrambled": ["pecas", "fora", "de", "ordem"],
+      "answer": "a frase correta montada",
+      "explanation": "por que esta e a ordem, em portugues"
+    }
+  ]
+}`;
+}
+
+// ---------------------------------------------------------------------------
+// Producao quadrupla
+// ---------------------------------------------------------------------------
+
+export interface ProductionAttempt {
+  languageCode: string;
+  languageName: string;
+  level: string;
+  /** O que o aluno escreveu. Vazio quando ele pulou o idioma. */
+  sentence: string;
+  /** A forma que ele deveria usar, vinda do conceito. */
+  term: string;
+}
+
+/**
+ * Avalia a MESMA frase escrita nos quatro idiomas.
+ *
+ * Este e o exame da tese do produto. Todo o resto e reconhecimento -- escolher
+ * alternativa, ordenar pecas dadas --, e reconhecimento esconde exatamente o
+ * que falha na hora de falar: puxar a forma da memoria sem nenhuma pista na
+ * tela.
+ *
+ * Avaliar as quatro JUNTAS, numa chamada so, nao e economia de token. E o que
+ * permite ao modelo ver o que nenhuma avaliacao isolada veria: que a frase
+ * alema saiu com a ordem russa, que a espanhola copiou a estrutura inglesa. O
+ * erro mais caro de quem estuda quatro idiomas so e visivel de cima.
+ */
+export function quadrupleProductionPrompt(
+  gloss: string,
+  attempts: ProductionAttempt[],
+): string {
+  const written = attempts
+    .map(
+      (a) =>
+        `--- ${a.languageName} (${a.languageCode}, nivel ${a.level}), usando "${a.term}":\n${
+          a.sentence.trim() || '(nao escreveu nada)'
+        }`,
+    )
+    .join('\n');
+
+  const codes = attempts.map((a) => a.languageCode).join('", "');
+
+  return `Voce avalia um brasileiro que estuda ingles, espanhol, alemao e russo AO MESMO TEMPO.
+Ele fala portugues nativo.
+
+O exercicio: dizer A MESMA COISA nos quatro idiomas, sem nenhuma alternativa na tela.
+
+O QUE ELE DEVIA DIZER (em portugues): ${gloss}
+
+O QUE ELE ESCREVEU:
+${written}
+
+Avalie cada idioma separadamente, mas OLHE O CONJUNTO antes de julgar cada um. O erro
+mais revelador deste aluno nao aparece numa frase isolada: e a frase alema saindo com a
+ordem do russo, a espanhola copiando a estrutura do ingles, o artigo aparecendo onde o
+russo nao tem artigo. Quando voce vir uma frase contaminada por OUTRO idioma desta mesma
+lista, diga qual em "sourceLanguage".
+
+Regras:
+- Julgue cada frase no NIVEL declarado daquele idioma. Uma frase simples num idioma A1
+  esta certa se estiver correta e natural; nao cobre sofisticacao que o nivel nao pede.
+- "ok" e true quando a frase esta correta e natural, mesmo que simples.
+- Idioma em que ele nao escreveu nada: "ok" false, "corrected" com a frase que ele
+  deveria ter escrito, e nenhum erro em "errors" (nao errou, deixou em branco).
+- "corrected" e sempre como um nativo diria, no nivel dele.
+- Em "errors", categoria e um destes: VOCABULARY, GRAMMAR, WORD_ORDER, ARTICLE, TENSE,
+  PREPOSITION, FALSE_COGNATE, SPELLING.
+- "sourceLanguage": "pt" ou um de "${codes}" quando o erro veio de interferencia; null
+  quando nao veio. Nao chute.
+- No maximo 2 erros por idioma, do mais grave ao menos.
+- "insight" e a leitura do CONJUNTO, em 1 ou 2 frases em portugues: o que a comparacao
+  entre as quatro tentativas revela. Se nao revelar nada, diga o que ele ja domina.
+
+Responda APENAS com JSON valido:
+{
+  "results": [
+    {
+      "languageCode": "${attempts[0]?.languageCode ?? 'en'}",
+      "ok": true,
+      "score": 0,
+      "corrected": "como um nativo diria",
+      "feedback": "1 ou 2 frases em portugues",
+      "errors": [
+        {
+          "category": "WORD_ORDER",
+          "description": "descricao curta em portugues",
+          "explanation": "a regra, e de qual idioma veio a interferencia",
+          "sourceLanguage": null,
+          "severity": 2
+        }
+      ]
+    }
+  ],
+  "insight": "o que a comparacao entre os quatro revela, em portugues"
+}
+Cada "score" vai de 0 a 100.`;
+}
+
+// ---------------------------------------------------------------------------
+// Captura de texto
+// ---------------------------------------------------------------------------
+
+/**
+ * Extrai de um texto real os termos que valem virar conceito.
+ *
+ * O filtro e a parte que importa, nao a extracao. Um texto qualquer tem
+ * centenas de palavras e quase nenhuma vale um card: as que o aluno ja sabe
+ * sao ruido, as muito acima do nivel dele nao vao firmar, e nome proprio nao e
+ * vocabulario. Pedir "as palavras dificeis" produziria uma lista de termos
+ * raros que ele nunca mais veria.
+ *
+ * O que se pede e outra coisa: alta frequencia real, dentro do alcance dele, e
+ * que a falta atrapalhe a leitura do proprio texto.
+ */
+export function extractTermsPrompt(ctx: LearnerContext, text: string, count: number): string {
+  return `Um brasileiro que estuda ${ctx.languageName} no nivel ${ctx.level} colou o texto abaixo
+porque quer aprender o vocabulario dele. Escolha ate ${count} termos que valem virar card.
+
+${contextBlock(ctx)}
+
+TEXTO:
+"""${text}"""
+
+Escolha os termos por ESTE criterio, nesta ordem:
+1. Frequencia real na lingua -- o que ele vai reencontrar, nao a palavra rara do texto.
+2. Alcance: no nivel ${ctx.level} ou um degrau acima. Acima disso nao firma.
+3. Impacto na compreensao: se nao saber a palavra atrapalha entender o texto, ela entra.
+
+NAO inclua:
+- Palavras que qualquer aluno de ${ctx.level} ja sabe.
+- Nomes proprios, numeros, datas, marcas.
+- Termos tecnicos de um dominio especifico que nao se repetem fora dele.
+- Palavras que ele ja esta aprendendo (listadas acima, se houver).
+
+Prefira expressoes inteiras a palavras soltas quando a expressao for a unidade real
+("to keep track of", "sich melden", "echar de menos"): e assim que a lingua e usada.
+
+Para cada termo:
+- "term": a forma de DICIONARIO, nao a forma flexionada do texto. Substantivo com artigo
+  quando o idioma tem artigo; verbo no infinitivo. Em russo, cirilico.
+- "meaning": o significado em portugues, curto. E ele que vira a chave do conceito, entao
+  escreva o SIGNIFICADO, nao uma parafrase longa. Avise entre parenteses quando a
+  construcao mudar (caso exigido, reflexivo, preposicao obrigatoria, falso cognato).
+- "example": a frase DO TEXTO em que o termo aparece, recortada. Se a frase do texto for
+  longa demais ou confusa, escreva uma curta e cotidiana no lugar.
+- "translation": a traducao do exemplo para o portugues.
+- "level": o nivel CEFR do termo (A1, A2, B1, B2, C1 ou C2).
+
+Responda APENAS com JSON valido:
+{
+  "terms": [
+    {
+      "term": "a forma de dicionario",
+      "meaning": "o significado em portugues",
+      "example": "a frase em ${ctx.languageName}",
+      "translation": "a traducao da frase",
+      "level": "B1"
+    }
+  ]
+}
+Devolva lista vazia se o texto nao tiver nenhum termo que valha a pena para este nivel.`;
 }

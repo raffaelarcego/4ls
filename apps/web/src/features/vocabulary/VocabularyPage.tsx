@@ -5,6 +5,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { languageTheme } from '../../lib/ui';
 import { api } from '../../services/api';
 import { VocabStatus } from '../../types';
+import { TextCapture } from './TextCapture';
 
 interface VocabularyRow {
   id: string;
@@ -38,6 +39,7 @@ const LANGUAGE_FILTERS = [
   { value: 'en', label: '🇬🇧 English' },
   { value: 'es', label: '🇪🇸 Español' },
   { value: 'de', label: '🇩🇪 Deutsch' },
+  { value: 'ru', label: '🇷🇺 Русский' },
 ];
 
 const STATUS_FILTERS = [
@@ -70,6 +72,8 @@ export function VocabularyPage() {
           Cada termo guarda contexto, histórico de acertos e a próxima revisão.
         </p>
       </header>
+
+      <TextCapture />
 
       <div className="space-y-2">
         <FilterRow options={LANGUAGE_FILTERS} value={language} onChange={setLanguage} />

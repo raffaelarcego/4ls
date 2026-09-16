@@ -8,6 +8,10 @@ export type AiTask =
   | 'tutor.correct'
   | 'exercise.generate'
   | 'grammar.drill'
+  | 'concept.translate'
+  | 'concept.extract'
+  | 'production.evaluate'
+  | 'structure.generate'
   | 'lesson.generate'
   | 'listening.generate'
   | 'dictation.generate'
@@ -34,6 +38,17 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // aqui de formas caras -- marca como errada uma frase correta, ou poe a
   // lacuna fora do ponto que o topico ensina.
   'grammar.drill',
+  // A aula de formacao de frase entra no pool e e reusada por meses, igual aos
+  // drills. Uma ordem de palavras errada aqui ensina a montar frase errada --
+  // o erro mais caro do produto, porque o aluno o repete em tudo que fala.
+  'structure.generate',
+  // Traduzir um conceito e curto, mas erra de um jeito que estraga: uma palavra
+  // pouco natural em russo vira card e o aluno decora o que ninguem diz.
+  'concept.translate',
+  // A producao quadrupla so vale se o modelo enxergar as quatro tentativas de
+  // cima e acusar a contaminacao entre elas -- exatamente o que o modelo rapido
+  // nao faz. Sem isso o exercicio vira quatro correcoes isoladas.
+  'production.evaluate',
 ]);
 
 export interface AiMessage {

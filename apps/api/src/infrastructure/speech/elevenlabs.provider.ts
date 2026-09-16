@@ -35,6 +35,7 @@ export class ElevenLabsProvider implements SpeechProvider {
       en: config.get<string>('ELEVENLABS_VOICE_EN', ''),
       es: config.get<string>('ELEVENLABS_VOICE_ES', ''),
       de: config.get<string>('ELEVENLABS_VOICE_DE', ''),
+      ru: config.get<string>('ELEVENLABS_VOICE_RU', ''),
     };
   }
 

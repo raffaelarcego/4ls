@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ProgressBar } from '../../components/ProgressBar';
 import { languageTheme, scoreTone } from '../../lib/ui';
 import { api } from '../../services/api';
+import { InterferencePanel } from './InterferencePanel';
 import { TopicView } from './TopicView';
 import { TopicSummary } from './types';
 
@@ -10,12 +11,13 @@ const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
   { code: 'de', label: 'Deutsch' },
+  { code: 'ru', label: 'Русский' },
 ];
 
 /**
  * Estudo de gramatica por contraste.
  *
- * A tese do modulo: quem estuda tres idiomas ao mesmo tempo raramente tem
+ * A tese do modulo: quem estuda quatro idiomas ao mesmo tempo raramente tem
  * duvida DENTRO de um idioma -- tem duvida no descompasso entre eles. Por isso
  * cada topico e apresentado com quem CONFIRMA a intuicao do aluno e quem
  * CONTRASTA com ela, e nao como uma regra solta do idioma alvo.
@@ -48,8 +50,8 @@ export function GrammarPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-black tracking-tight">Estruturas</h1>
         <p className="text-sm font-semibold text-wolf">
-          Cada ponto aparece comparado nos quatro idiomas. Você aprende um usando os outros
-          dois como referência — um que confirma sua intuição e um que a quebra.
+          Cada ponto aparece comparado nos cinco idiomas. Você aprende um usando os outros
+          como referência — um que confirma sua intuição e um que a quebra.
         </p>
       </header>
 
@@ -73,6 +75,13 @@ export function GrammarPage() {
           );
         })}
       </div>
+
+      {/*
+        Vem antes da lista de topicos de proposito: o que o aluno esta errando
+        de verdade vale mais que o catalogo inteiro em ordem. O painel some
+        sozinho quando nao ha interferencia registrada.
+      */}
+      <InterferencePanel onOpenTopic={setOpenTopic} />
 
       {isLoading ? (
         <div className="card flex min-h-[12rem] items-center justify-center">

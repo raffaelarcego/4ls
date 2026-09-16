@@ -1,6 +1,6 @@
 # Raffael 4L
 
-Sistema operacional pessoal para aquisição de idiomas — inglês, espanhol e alemão em 1 hora por dia.
+Sistema operacional pessoal para aquisição de idiomas — inglês, espanhol, alemão e russo em 1 hora por dia.
 
 O produto responde a uma única pergunta ao abrir: **"o que eu deveria estudar agora?"**. O dashboard já entrega a sessão pronta, montada a partir do seu desempenho.
 
@@ -9,12 +9,42 @@ O produto responde a uma única pergunta ao abrir: **"o que eu deveria estudar a
 ```bash
 npm install
 npm run db:migrate        # cria as tabelas
-npm run db:seed           # idiomas, conquistas e vocabulário inicial
+npm run db:seed           # idiomas, conquistas e conceitos iniciais
 npm run dev               # sobe API (3333) e web (5173) juntos
 npm test                  # testes dos motores (sem banco, sem rede)
 ```
 
-Abra http://localhost:5173 e crie uma conta. Ela já nasce com os três idiomas configurados (inglês B2, espanhol A2, alemão A1) e 45 termos prontos para revisar.
+Se voce ja usava o app antes dos conceitos, o vocabulario antigo ficou fora da
+rede -- cada termo continua valendo como card, mas sozinho, que e justamente o
+que os conceitos vieram corrigir. Para puxa-lo para dentro:
+
+```bash
+npm run db:backfill-concepts -- --dry-run   # mostra o plano, nao grava nada
+npm run db:backfill-concepts                # liga, completa com IA e matricula
+```
+
+O backfill roda em tres fases: liga cada termo solto a um conceito pelo
+significado em portugues (de graca), completa com IA so o que sobrou faltando e
+matricula nos outros idiomas **apenas** quem ja tinha aquele conceito em algum
+deles. Tem teto de 100 chamadas de IA por execucao (`--limit=N` muda), entao
+rodar duas vezes e seguro e continua de onde parou.
+
+### Manutencao
+
+```bash
+npm run db:enroll-languages                      # matricula usuarios antigos num idioma novo
+npm run db:merge-concepts -- <origem> <destino>   # funde dois conceitos que sao o mesmo significado
+npm run db:rewind -- 1                           # empurra as sessoes um dia para tras (dev)
+```
+
+`db:enroll-languages` existe porque o cadastro matricula nos idiomas do momento e
+nunca mais volta ao assunto: quando o russo entrou, quem ja tinha conta ficou sem
+ele. `db:merge-concepts` resolve a colisao que o codigo deliberadamente nao
+resolve sozinho -- quando a IA gera para um conceito um termo que ja e de outro,
+os dois quase sempre sao o mesmo significado, mas "pasta" de arquivo e "pasta" de
+comer provam que nem sempre. Quem decide e uma pessoa olhando.
+
+Abra http://localhost:5173 e crie uma conta. Ela já nasce com os quatro idiomas configurados (inglês B2, espanhol A2, alemão A1, russo A1) e 22 conceitos — 88 termos — prontos para revisar.
 
 ### Pré-requisitos
 
@@ -65,7 +95,7 @@ SPEECH_PROVIDER_ORDER="mimo,openai,elevenlabs"
 
 A MiMo **não** expõe `/audio/speech` como a OpenAI. TTS e ASR passam pelo próprio `/chat/completions`, e o formato tem uma inversão que custa tempo descobrir: o texto a ser falado vai na mensagem **`assistant`**, e a mensagem **`user`** carrega a instrução de estilo em linguagem natural. Mandar o texto no `user` responde `messages must contain an assistant role for TTS model`.
 
-Vozes por idioma em `MIMO_VOICE_EN/ES/DE` (Mia, Chloe, Milo, Dean, além das chinesas). Timbres distintos ajudam a não confundir os três cursos.
+Vozes por idioma em `MIMO_VOICE_EN/ES/DE/RU` (Mia, Chloe, Milo, Dean, Emma, além das chinesas). Timbres distintos ajudam a não confundir os quatro cursos.
 
 O áudio volta em **WAV**, sem opção comprimida — cerca de 150–180 KB por frase curta. Como cada frase é sintetizada uma única vez e fica em cache, o custo é de armazenamento, não de repetição; **Progresso → Cache de voz** mostra quanto já foi guardado.
 
@@ -78,7 +108,7 @@ O áudio volta em **WAV**, sem opção comprimida — cerca de 150–180 KB por 
 
 Alimentar o Speaking Lab com uma transcrição corrompida seria pior que não ter transcrição: o aluno receberia correção sobre um texto que nunca disse. Com a lista vazia, `/speech/status` responde `stt: false` e o front usa o reconhecimento do próprio navegador.
 
-Para transcrição de verdade nos três idiomas, configure `SPEECH_API_KEY` (Whisper ou compatível). Para habilitar a MiMo só em inglês e com áudio wav: `MIMO_ASR_LANGUAGES="en"`.
+Para transcrição de verdade nos quatro idiomas, configure `SPEECH_API_KEY` (Whisper ou compatível). Para habilitar a MiMo só em inglês e com áudio wav: `MIMO_ASR_LANGUAGES="en"`.
 
 ### Sem chave nenhuma
 
@@ -165,24 +195,53 @@ apps/
 │       ├── infrastructure/
 │       │   ├── ai/           AI Gateway: providers, router, prompts versionados
 │       │   └── database/
-│       └── modules/          auth, languages, vocabulary, review, errors,
-│                             gamification, study, tutor, speech, dashboard,
-│                             analytics
+│       └── modules/          auth, languages, concepts, structure, vocabulary,
+│                             review, errors, gamification, study, grammar,
+│                             tutor, speech, dashboard, analytics
 └── web/                      React + TypeScript + Tailwind + TanStack Query + Zustand
 ```
 
 ### Os motores que importam
 
+**Concept Engine** (`apps/api/src/modules/concepts/concepts.service.ts`)
+A unidade de aprendizado não é a palavra, é o **conceito**: um significado em português que existe nos quatro idiomas ao mesmo tempo. "trabalho" entra na sessão uma vez e chega como `work`, `el trabajo`, `die Arbeit` e `работа` no mesmo dia.
+
+Isso não é organização de banco, é a tese de aprendizado do produto: a memória de uma língua sustenta a das outras quando as quatro palavras entram penduradas no mesmo gancho. Aprender `Arbeit` isolado, três semanas depois de `work`, é aprender duas coisas; aprender as quatro juntas é aprender uma.
+
+Toda porta de entrada de vocabulário passa por aqui — palavra salva à mão, termo vindo do listening, sugestão do tutor. O serviço acha ou cria o conceito, **completa** com IA o que falta nos outros idiomas e só então matricula o aluno, nos quatro de uma vez. Conceito incompleto não vira aula do dia: degradar é melhor que travar, mas nunca em silêncio.
+
+**Sentence Structure Engine** (`apps/api/src/modules/structure/`)
+Saber o que `Arbeit` significa não ensina a dizer "amanhã de manhã eu vou para o trabalho de ônibus". Cada idioma monta a frase com uma ordem, uma marcação e umas obrigações próprias — e sem isso o aluno junta palavras certas numa frase que nenhum nativo diria.
+
+O catálogo de padrões (`sentence-patterns.catalog.ts`) é **curado**, pela mesma razão do catálogo de contrastes: uma regra de ordem de palavras errada é pior que nenhuma, porque o aluno a aplica em tudo que fala. A IA escreve as frases, desmonta os exemplos em constituintes rotulados e cria os exercícios **em cima** do mapa, nunca o mapa. Cada aula guarda `formula`, passos de montagem, exemplos fatiados peça a peça, armadilhas de interferência do português e exercícios de ordenação — e vai para um pool por (idioma, nível, padrão), então o custo de IA vai a zero depois que ele enche.
+
+O padrão escolhido é o de menor domínio para o nível do aluno, não rotação cega: se a ordem do verbo alemão ainda não firmou, ela volta.
+
 **Daily Mission Engine** (`apps/api/src/modules/study/mission.engine.ts`)
 Planejador determinístico e auditável. Cada tipo de atividade recebe uma pontuação de necessidade a partir de três forças: fraqueza da competência, erros recorrentes abertos e variedade em relação às sessões recentes. Revisão vencida sempre vem primeiro. É isso que permite responder *por que* cada bloco foi recomendado — o motivo aparece na tela.
 
-A IA é refinamento **opcional** por cima disso (`?ai=true`). Se o plano da IA perder um idioma ou estourar o tempo, ele é rejeitado e o plano determinístico prevalece.
+Dois blocos **não** passam pela pontuação: `structure` e `vocabulary` entram em todo idioma, todo dia. Não são os mais "necessários" pelo score — são os dois que sustentam a promessa do produto (o mesmo conceito nos quatro idiomas, e a regra de frase de cada um), e por isso não competem por vaga. O planejador reserva o tempo deles antes de distribuir o resto, para que uma revisão acumulada não engula a aula do dia.
+
+A IA é refinamento **opcional** por cima disso (`?ai=true`). Se o plano da IA perder um idioma, remover um dos blocos obrigatórios ou estourar o tempo, ele é rejeitado e o plano determinístico prevalece.
 
 **Spaced Repetition Engine** (`apps/api/src/modules/review/srs.engine.ts`)
 Derivado do SM-2, mas ancorado na escada 1-3-7-14-30-60 dias definida no produto; o ease factor apenas estica ou encolhe essa escada. Intervalos ficam previsíveis e legíveis, sem abrir mão da adaptação por item.
 
+Acima dele existe uma segunda camada, no nível do **conceito** (`concept_progress`). O SRS por card não consegue distinguir duas falhas opostas: "não sei o que isso significa" e "sei o significado, não consigo puxar a forma russa". A primeira pede reensinar o conceito; a segunda pede só treino de recuperação naquele idioma, e reapresentar o significado ali é desperdício.
+
+`meaningStrength` mede o conceito através de todos os idiomas e é o que autoriza o **andaime**: quando o significado já firmou em outro idioma e a forma deste não, a revisão oferece a palavra que você já domina como dica. Ela fica atrás de um botão de propósito — dica dada cedo demais rouba o esforço de recuperação, que é justamente o que consolida.
+
+**Produção quádrupla** (`POST /concepts/production/evaluate`)
+Todo o resto do produto é reconhecimento: escolher alternativa, ordenar peças dadas. Reconhecimento esconde exatamente o que falha na hora de falar — puxar a forma da memória sem nada na tela. Aqui você escreve a mesma frase nos quatro idiomas, sem alternativas.
+
+As quatro vão para a IA numa **única** chamada, e isso não é economia de token: é o que permite ver o que nenhuma avaliação isolada veria — a frase alemã saindo com a ordem russa, a espanhola copiando a estrutura inglesa. Avaliadas em separado, cada uma seria "erro de ordem das palavras" e a causa se perderia. Entra uma vez por semana, não todo dia: os conceitos precisam assentar entre uma produção e a seguinte.
+
 **Error Intelligence** (`apps/api/src/modules/errors/errors.service.ts`)
 Erros iguais não criam linhas novas — incrementam `occurrenceCount`. É isso que revela padrões ("ordem das palavras: 8 ocorrências") e realimenta o Daily Mission Engine, fechando o ciclo: erro → dado → nova atividade.
+
+Desde a entrada do russo, cada erro guarda também a **origem da interferência** (`sourceLanguageId`): de qual dos outros idiomas ele veio. É o dado que só este produto consegue produzir, porque só ele sabe quais são os seus outros três idiomas — quem estuda quatro línguas quase nunca erra por ignorância, erra por importar a regra da vizinha.
+
+Isso fecha um ciclo que antes parava no meio: o erro aponta o par de idiomas, `suggestedTopics` acha no catálogo de contrastes os pontos em que esses dois **divergem**, e a tela de Estruturas mostra o que estudar. "8 erros de ordem das palavras" virou "o russo está entrando no seu alemão, e é este tópico que resolve". A extração é conservadora por instrução explícita no prompt: um palpite de origem é pior que origem nenhuma, porque mandaria você estudar um contraste que nunca te atrapalhou.
 
 A deduplicação usa a **categoria** como chave, não o texto da descrição. O motivo é concreto: o modelo reformula a descrição a cada chamada, então casar por string criaria uma linha nova toda vez e a contagem nunca acumularia. A categoria é um enum fixo e é exatamente a unidade que o dashboard e o motor adaptativo consomem. Erros de vocabulário são a exceção — ali a palavra específica importa, então casam por termo.
 
@@ -194,9 +253,15 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 
 ## O que já funciona
 
-- Autenticação JWT, com matrícula automática nos 3 idiomas e vocabulário inicial
+- Autenticação JWT, com matrícula automática nos 4 idiomas e conceitos iniciais
 - Dashboard com sessão pronta, streak, XP, competências CEFR e erros recorrentes por idioma
 - Sessão de estudo com cronômetro, flashcards SRS, exercícios gerados por IA e blocos autoavaliados
+- **Conceitos nos quatro idiomas de uma vez** — o bloco de vocabulário mostra o mesmo significado em inglês, espanhol, alemão e russo lado a lado, e o teste é cruzado entre idiomas de propósito
+- **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
+- **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
+- **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Captura de texto** — cole um artigo e o vocabulário dele entra como conceito, já nos quatro idiomas
+- **Formação de frase por idioma** — bloco diário com a fórmula, os passos de montagem, exemplos fatiados em constituintes rotulados e exercícios de ordenação
 - Vocabulário em contexto (exemplo + tradução do exemplo, nunca "palavra = tradução")
 - **Áudio em toda parte**: botão de ouvir no flashcard, no vocabulário, no enunciado do exercício e na fala do tutor
 - **Listening com conteúdo próprio** — diálogo gerado no seu nível, falado em voz alta, com perguntas de compreensão que dão nota objetiva
@@ -230,6 +295,15 @@ POST /api/study/sessions/:id/complete
 GET  /api/review/due                     itens vencidos
 POST /api/review/:id/grade               again | hard | good | easy
 GET  /api/vocabulary                     POST /api/vocabulary
+GET  /api/concepts/lesson                os conceitos de hoje, nos 4 idiomas
+GET  /api/concepts/coverage              quantos já existem nos 4 idiomas
+POST /api/concepts/learn                 aprende um termo — entra nos 4 de uma vez
+GET  /api/structure/lesson               a aula de formação de frase do dia
+POST /api/structure/record               resultado da rodada de montagem
+GET  /api/concepts/production/mission    o conceito da vez para produção livre
+POST /api/concepts/production/evaluate   avalia as 4 frases juntas
+POST /api/concepts/capture               extrai vocabulário de um texto colado
+GET  /api/errors/interference            quais idiomas estão contaminando quais
 POST /api/tutor/message                  conversa + correção estruturada
 POST /api/tutor/exercises                exercícios mirando suas fraquezas
 POST /api/tutor/writing                  Writing Lab

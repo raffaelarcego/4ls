@@ -5,8 +5,15 @@ import { CefrLevel } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 
-/** Estado inicial dos 3 idiomas, conforme o perfil do produto. */
-const DEFAULT_LANGUAGE_SETUP: Array<{
+/**
+ * Estado inicial dos 4 idiomas, conforme o perfil do produto.
+ *
+ * Exportado porque o cadastro nao e o unico lugar que precisa dele: quando um
+ * idioma novo entra no produto, os usuarios que ja existiam tambem tem de ser
+ * matriculados (ver prisma/enroll-languages.ts). Duas copias desta lista
+ * divergiriam no primeiro idioma adicionado.
+ */
+export const DEFAULT_LANGUAGE_SETUP: Array<{
   code: string;
   currentLevel: CefrLevel;
   targetLevel: CefrLevel;
@@ -15,7 +22,17 @@ const DEFAULT_LANGUAGE_SETUP: Array<{
   { code: 'en', currentLevel: CefrLevel.B2, targetLevel: CefrLevel.C1, priority: 1 },
   { code: 'es', currentLevel: CefrLevel.A2, targetLevel: CefrLevel.B2, priority: 2 },
   { code: 'de', currentLevel: CefrLevel.A1, targetLevel: CefrLevel.B1, priority: 3 },
+  { code: 'ru', currentLevel: CefrLevel.A1, targetLevel: CefrLevel.A2, priority: 4 },
 ];
+
+/**
+ * Minutos por idioma no cadastro.
+ *
+ * Com quatro idiomas, 20 minutos cada estouraria o dia padrao de 60. O valor
+ * fecha exatamente o padrao do produto (4 x 15 = 60) -- o aluno redistribui
+ * depois pela tela de idiomas, mas comeca com um dia que cabe no dia.
+ */
+export const DEFAULT_MINUTES_PER_LANGUAGE = 15;
 
 @Injectable()
 export class AuthService {
@@ -40,7 +57,7 @@ export class AuthService {
       },
     });
 
-    // Matricula o usuario nos tres idiomas com os niveis do perfil inicial.
+    // Matricula o usuario nos quatro idiomas com os niveis do perfil inicial.
     const languages = await this.prisma.language.findMany();
     const byCode = new Map(languages.map((l) => [l.code, l.id]));
 
@@ -51,7 +68,7 @@ export class AuthService {
         currentLevel: s.currentLevel,
         targetLevel: s.targetLevel,
         priority: s.priority,
-        minutesPerDay: 20,
+        minutesPerDay: DEFAULT_MINUTES_PER_LANGUAGE,
       })),
     });
 
