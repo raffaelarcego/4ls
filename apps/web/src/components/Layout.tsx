@@ -36,11 +36,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const banner = useBottomBanner();
   // No desktop a barra fica rente ao rodape (sem abas embaixo), entao ela ocupa
   // bem menos altura -- por isso a reserva e menor la.
-  const bottomSpace = banner
-    ? banner === 'install'
-      ? 'pb-64 lg:pb-28'
-      : 'pb-48 lg:pb-24'
-    : 'pb-28 lg:pb-12';
+  // Agora que a barra cabe em uma linha, a reserva encolheu junto: abas (~58px)
+  // mais barra (~56px) contra as abas sozinhas.
+  const bottomSpace = banner ? 'pb-40 lg:pb-24' : 'pb-24 lg:pb-12';
 
   return (
     <div className="min-h-screen bg-white">
@@ -111,30 +109,32 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Abas (mobile) */}
-      {/* grid-cols segue o tamanho de NAV: com um item a mais e a contagem
-          fixa, o quinto icone quebrava para uma segunda linha.
-          pb-[env(safe-area-inset-bottom)] mantem as abas acima da barra
-          de gestos do iPhone, ja que o viewport e viewport-fit=cover. */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-20 grid border-t-2 border-swan bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
-        style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }}
-      >
+      {/*
+        `grid-flow-col auto-cols-fr` garante UMA linha, sempre, seja qual for a
+        quantidade de abas -- a regra e do CSS, nao de uma contagem calculada.
+        A versao anterior montava `grid-template-columns` num style inline a
+        partir de NAV.length; bastava esse style nao chegar ao DOM para as abas
+        caírem no padrao de quatro colunas e a quinta quebrar para uma segunda
+        linha, dobrando a altura da barra.
+
+        pb-[env(safe-area-inset-bottom)] mantem as abas acima da barra de gestos
+        do iPhone, ja que o viewport e viewport-fit=cover.
+      */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 grid auto-cols-fr grid-flow-col border-t-2 border-swan bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         {NAV.map(({ to, label, Icon, tone }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex min-w-0 flex-col items-center gap-0.5 py-2.5 text-[10px] font-extrabold uppercase tracking-wide transition ${
+              `flex min-w-0 flex-col items-center gap-0.5 py-2 text-[10px] font-extrabold uppercase tracking-wide transition ${
                 isActive ? `${tone}` : 'text-hare'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span
-                  className={`rounded-xl px-3.5 py-1 transition ${isActive ? 'bg-snow' : ''}`}
-                >
+                <span className={`rounded-xl px-3 py-0.5 transition ${isActive ? 'bg-snow' : ''}`}>
                   <Icon className="h-6 w-6" />
                 </span>
                 {/* `truncate` e a garantia, nao o acabamento: "Estruturas" e

@@ -7,11 +7,20 @@ import { InterferencePanel } from './InterferencePanel';
 import { TopicView } from './TopicView';
 import { TopicSummary } from './types';
 
+/**
+ * `short` existe porque o rotulo inteiro nao cabe.
+ *
+ * Com quatro idiomas num aparelho de 360px sobram 76px por botao, e
+ * "Deutsch" com bandeira e respiro precisa de uns 100px. Como `flex-1` nao
+ * encolhe um item abaixo do proprio conteudo, a linha estourava para fora da
+ * tela e os dois ultimos idiomas ficavam inalcancaveis -- o alemao sumia sem
+ * nenhum sinal de que havia algo ali.
+ */
 const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Español' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'ru', label: 'Русский' },
+  { code: 'en', label: 'English', short: 'EN' },
+  { code: 'es', label: 'Español', short: 'ES' },
+  { code: 'de', label: 'Deutsch', short: 'DE' },
+  { code: 'ru', label: 'Русский', short: 'RU' },
 ];
 
 /**
@@ -63,14 +72,15 @@ export function GrammarPage() {
             <button
               key={option.code}
               onClick={() => setLanguage(option.code)}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-b-[4px] px-3 py-2.5 text-sm font-extrabold transition active:translate-y-[2px] active:border-b-2 ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 border-b-[4px] px-2 py-2.5 text-sm font-extrabold transition active:translate-y-[2px] active:border-b-2 ${
                 active
                   ? `${theme.border} ${theme.soft} ${theme.text}`
                   : 'border-swan bg-white text-wolf hover:bg-snow'
               }`}
             >
-              <span>{theme.flag}</span>
-              {option.label}
+              <span aria-hidden>{theme.flag}</span>
+              <span className="sm:hidden">{option.short}</span>
+              <span className="hidden truncate sm:inline">{option.label}</span>
             </button>
           );
         })}

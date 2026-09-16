@@ -12,7 +12,14 @@
  * fila de sincronizacao e resolucao de conflito.
  */
 
-const VERSION = 'v1';
+/*
+ * Suba esta versao sempre que a casca do app mudar de forma visivel.
+ *
+ * Trocar o numero descarta os caches antigos no `activate` -- e sem isso um
+ * aluno com o app ja instalado pode continuar vendo a interface velha depois
+ * de um deploy, concluindo que a correcao nao saiu.
+ */
+const VERSION = 'v2';
 const SHELL = `4l-shell-${VERSION}`;
 const ASSETS = `4l-assets-${VERSION}`;
 
