@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useBottomBanner } from '../lib/pwa';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
 import { DashboardData } from '../types';
 import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
-import { InstallPrompt } from './InstallPrompt';
+import { InstallButton, InstallPrompt } from './InstallPrompt';
 
 const NAV = [
   { to: '/', label: 'Aprender', Icon: HomeIcon, tone: 'text-macaw' },
@@ -25,6 +26,21 @@ export function Layout({ children }: { children: ReactNode }) {
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get('/dashboard')).data,
   });
+
+  /*
+   * A barra fixa do rodape cobre o fim da pagina, e o `pb` do conteudo so
+   * reservava espaco para as abas. Com a barra aberta, o ultimo card ficava
+   * atras dela -- visivel pela metade e intocavel. Reservar so quando ela
+   * existe evita o espaco vazio permanente que um padding fixo deixaria.
+   */
+  const banner = useBottomBanner();
+  // No desktop a barra fica rente ao rodape (sem abas embaixo), entao ela ocupa
+  // bem menos altura -- por isso a reserva e menor la.
+  const bottomSpace = banner
+    ? banner === 'install'
+      ? 'pb-64 lg:pb-28'
+      : 'pb-48 lg:pb-24'
+    : 'pb-28 lg:pb-12';
 
   return (
     <div className="min-h-screen bg-white">
@@ -67,6 +83,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <LogoutIcon className="h-4 w-4" />
             Sair
           </button>
+          <InstallButton className="mt-2 w-full justify-center" />
         </div>
       </aside>
 
@@ -77,6 +94,11 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className="text-xl font-black tracking-tight text-grass lg:hidden">
               4L<span className="text-macaw">.</span>
             </span>
+            {/* Caminho permanente para instalar. Some sozinho quando o app ja
+                esta instalado -- ate la, e o unico ponto que nao depende de o
+                navegador decidir oferecer. No desktop ele vive na barra
+                lateral, entao aqui some para nao aparecer duas vezes. */}
+            <InstallButton className="lg:hidden" />
             <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
               <Score emoji="🔥" value={data ? `${data.streak.current}` : '—'} label="ofensiva" tone="text-beak" />
               <Score emoji="⚡" value={data ? `${data.xp.today}` : '—'} label="xp hoje" tone="text-bee-dark" />
@@ -85,7 +107,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-3xl px-4 pb-28 pt-5 lg:pb-12">{children}</main>
+        <main className={`mx-auto max-w-3xl px-4 pt-5 ${bottomSpace}`}>{children}</main>
       </div>
 
       {/* Abas (mobile) */}
@@ -103,7 +125,7 @@ export function Layout({ children }: { children: ReactNode }) {
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-extrabold uppercase tracking-wider transition ${
+              `flex min-w-0 flex-col items-center gap-0.5 py-2.5 text-[10px] font-extrabold uppercase tracking-wide transition ${
                 isActive ? `${tone}` : 'text-hare'
               }`
             }
@@ -115,7 +137,12 @@ export function Layout({ children }: { children: ReactNode }) {
                 >
                   <Icon className="h-6 w-6" />
                 </span>
-                {label}
+                {/* `truncate` e a garantia, nao o acabamento: "Estruturas" e
+                    "Progresso" em caixa alta ocupam quase os 72px de uma celula
+                    num aparelho de 360px, e bastava uma fonte um pouco mais
+                    larga para o rotulo pular para a segunda linha e desalinhar
+                    a barra inteira. */}
+                <span className="w-full truncate px-0.5 text-center">{label}</span>
               </>
             )}
           </NavLink>

@@ -272,6 +272,7 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - Gamificação: XP por tipo de atividade, streak com virada de dia correta, 7 conquistas
 - Analytics: tempo por idioma, consistência, Weekly Review com recomendação, custo de IA por modelo
 - **Prática livre** — o planejador continua mandando no que você *deveria* fazer, mas você pode pedir um bloco específico e ele entra na sessão de hoje valendo XP igual
+- **Instalável como app** (PWA) — manifest, service worker e um guia de instalação por plataforma, alcançável a qualquer momento pelo botão 📲 no cabeçalho
 - Testes dos motores (`npm test`): escada do SRS, ranking do planejador, deduplicação de erros e o parser de resposta da IA
 
 ## O que ainda não existe
@@ -281,7 +282,19 @@ Estes itens da especificação ficaram fora desta entrega:
 - **Conteúdo de reading** — não há biblioteca de textos. O bloco de leitura ainda cai nos exercícios gerados, sem texto-fonte próprio.
 - **Avaliação de pronúncia** — o Speaking Lab avalia o que a transcrição revela (gramática, vocabulário, fluência, cumprimento da missão). Pronúncia em si exige análise do áudio, não do texto, e não está feita — o prompt é explícito em tratar qualquer suspeita de pronúncia como hipótese.
 - **CEFR Engine completo** (MVP 4) — as subcompetências são rastreadas e há uma nota composta ponderada com sugestão de nível, mas a promoção de nível ainda não é automática.
-- PWA, notificações, A/B testing, biblioteca de conteúdo (MVP 5).
+- Notificações, A/B testing, biblioteca de conteúdo (MVP 5).
+
+## Instalar no celular
+
+O 4L é um site que se instala como aplicativo — não há loja nem build nativo. O botão **📲 Instalar** fica no cabeçalho e some sozinho depois que o app está instalado.
+
+Onde isso costuma falhar, e o que o guia responde:
+
+- **Navegador dentro de outro app** (Instagram, WhatsApp, LinkedIn). É a causa mais comum e a mais invisível: o webview não instala nada, e nada na tela denuncia que você não está no Chrome. O guia detecta pelo user agent e oferece o endereço para copiar.
+- **iPhone.** O iOS nunca dispara `beforeinstallprompt`: não existe botão, o caminho é Compartilhar → Adicionar à Tela de Início, e só no Safari — Chrome e Firefox no iPhone não conseguem.
+- **Sem HTTPS.** Nenhum navegador instala, e nenhuma instrução de menu resolve.
+
+O convite automático que aparece no rodapé pode ser adiado, não dispensado para sempre: "Agora não" o some por sete dias. A versão anterior gravava um booleano permanente, e um toque distraído apagava o único caminho de instalação que existia na interface.
 
 ## Endpoints principais
 

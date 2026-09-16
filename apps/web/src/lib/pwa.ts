@@ -62,6 +62,89 @@ export function isIos(): boolean {
 }
 
 /**
+ * Navegador embutido de outro app (Instagram, WhatsApp, LinkedIn...).
+ *
+ * E a causa mais comum de "nao consigo instalar" e a mais invisivel: quem abre
+ * o link por uma mensagem nao esta no Chrome nem no Safari, esta num webview
+ * que simplesmente nao instala nada. Nada na tela denuncia isso -- a pagina
+ * parece um navegador normal --, entao sem detectar e avisar, a pessoa tenta,
+ * falha e conclui que o app e que esta quebrado.
+ */
+export function isInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+
+  return (
+    /FBAN|FBAV|FB_IAB/i.test(ua) || // Facebook e Messenger
+    /Instagram/i.test(ua) ||
+    /WhatsApp/i.test(ua) ||
+    /LinkedInApp/i.test(ua) ||
+    /Twitter|TwitterAndroid/i.test(ua) ||
+    /MicroMessenger/i.test(ua) || // WeChat
+    /BytedanceWebview|musical_ly/i.test(ua) || // TikTok
+    /Line\//i.test(ua) ||
+    /Snapchat/i.test(ua)
+  );
+}
+
+/** O navegador e o Safari de verdade (nao Chrome/Firefox no iOS)? */
+function isSafari(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Android/i.test(ua);
+}
+
+/**
+ * Por que a instalacao esta (ou nao esta) disponivel agora.
+ *
+ * A interface precisa desta distincao porque cada caso pede uma frase
+ * diferente, e a frase generica ("use o menu do navegador") nao ajuda ninguem:
+ * no iPhone o caminho e o botao Compartilhar, no Android e o menu de tres
+ * pontos, e num webview nao existe caminho nenhum.
+ */
+export type InstallPlatform =
+  | 'installed'
+  | 'prompt'
+  | 'ios-safari'
+  | 'ios-other'
+  | 'in-app'
+  | 'android'
+  | 'desktop'
+  | 'unsupported';
+
+export function installPlatform(canPrompt: boolean): InstallPlatform {
+  if (isStandalone()) return 'installed';
+
+  // O dialogo nativo esta em maos: nada mais importa.
+  if (canPrompt) return 'prompt';
+
+  if (isInAppBrowser()) return 'in-app';
+
+  if (isIos()) return isSafari() ? 'ios-safari' : 'ios-other';
+
+  if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) return 'android';
+
+  if (typeof navigator !== 'undefined' && /Firefox/i.test(navigator.userAgent)) {
+    // O Firefox desktop nao instala PWA, e fingir que instala seria pior.
+    return 'unsupported';
+  }
+
+  return 'desktop';
+}
+
+/**
+ * O site esta num contexto que permite instalar?
+ *
+ * Sem HTTPS (ou localhost) o navegador nao registra service worker nem oferece
+ * instalacao, e nenhuma instrucao de menu vai resolver. Vale dizer isso em vez
+ * de mandar o usuario procurar uma opcao que nao existe ali.
+ */
+export function isSecureContextForInstall(): boolean {
+  if (typeof window === 'undefined') return true;
+  return window.isSecureContext;
+}
+
+/**
  * Estado de instalacao para a interface.
  *
  * O iOS nunca dispara `beforeinstallprompt` -- no Safari a instalacao e
@@ -152,6 +235,73 @@ export function registerServiceWorker() {
       // Falha em registrar nao pode derrubar o app: ele funciona sem o
       // worker, so perde a instalacao e a abertura offline.
     });
+}
+
+/**
+ * Ha uma barra fixa no rodape agora? Qual?
+ *
+ * Mora aqui, no modulo, e nao dentro do componente da barra, porque DUAS telas
+ * precisam da resposta: a barra, para se desenhar, e o Layout, para reservar o
+ * espaco dela no rodape do conteudo. Sem essa segunda parte a barra cobre o fim
+ * da pagina -- o botao do ultimo card fica atras dela e nao da para tocar.
+ *
+ * O estado do adiamento tambem vive aqui pelo mesmo motivo: se ficasse no
+ * componente, o Layout nao teria como saber que a barra sumiu e continuaria
+ * reservando espaco para uma barra que nao existe mais.
+ */
+const SNOOZE_KEY = '4l.install.snoozedUntil';
+
+/**
+ * Quanto tempo o convite some depois de "Agora nao".
+ *
+ * Antes ele sumia PARA SEMPRE, gravado num booleano. Parecia respeitoso e era
+ * uma armadilha: um toque distraido apagava o unico caminho de instalacao que
+ * a interface oferecia, sem nenhuma forma de traze-lo de volta a nao ser
+ * limpar os dados do site.
+ */
+const SNOOZE_DAYS = 7;
+
+function readSnooze(): number {
+  try {
+    return Number(localStorage.getItem(SNOOZE_KEY) ?? 0);
+  } catch {
+    // Armazenamento bloqueado: melhor mostrar o convite do que quebrar a tela.
+    return 0;
+  }
+}
+
+let snoozedUntil = typeof window === 'undefined' ? 0 : readSnooze();
+const snoozeListeners = new Set<() => void>();
+
+export function snoozeInstall() {
+  snoozedUntil = Date.now() + SNOOZE_DAYS * 86_400_000;
+  try {
+    localStorage.setItem(SNOOZE_KEY, String(snoozedUntil));
+  } catch {
+    // Sem persistir, o convite volta na proxima visita. Aceitavel.
+  }
+  for (const listener of snoozeListeners) listener();
+}
+
+export type BannerKind = 'update' | 'install' | null;
+
+export function useBottomBanner(): BannerKind {
+  const { canPrompt, needsManualSteps } = useInstall();
+  const { updateReady } = useServiceWorker();
+  const [snoozed, setSnoozed] = useState(snoozedUntil > Date.now());
+
+  useEffect(() => {
+    const update = () => setSnoozed(snoozedUntil > Date.now());
+    snoozeListeners.add(update);
+    return () => {
+      snoozeListeners.delete(update);
+    };
+  }, []);
+
+  // Atualizacao tem prioridade: e a unica das duas que corrige alguma coisa.
+  if (updateReady) return 'update';
+  if (snoozed || isStandalone()) return null;
+  return canPrompt || needsManualSteps ? 'install' : null;
 }
 
 /** Avisa quando ha versao nova esperando para assumir. */
