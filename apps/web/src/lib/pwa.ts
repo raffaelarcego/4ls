@@ -5,6 +5,22 @@
  * nativo: o navegador oferece a instalacao quando o site tem manifest, service
  * worker e HTTPS. Este arquivo cuida das duas pontas disso -- registrar o
  * worker e saber quando ha versao nova.
+ *
+ * METADE DISTO DEPENDE DO `apps/web/vercel.json`, e la nao cabe explicacao:
+ * vercel.json e JSON puro, nao aceita comentario, e o schema da Vercel recusa
+ * o truque de por uma chave "//" dentro de `headers`. As tres regras de la que
+ * sustentam o que este arquivo faz:
+ *
+ * 1. A reescrita de SPA manda toda rota para o index.html, MENOS os arquivos
+ *    que precisam ser servidos como si mesmos (`sw.js`, `manifest.webmanifest`,
+ *    `robots.txt`, `assets/`, imagens). Servidos como HTML, o navegador
+ *    simplesmente nunca oferece a instalacao -- e sem mensagem de erro
+ *    nenhuma, que e o que torna esse engano tao caro de achar.
+ * 2. O `sw.js` vai com `max-age=0, must-revalidate`. Se o navegador servir um
+ *    service worker velho do cache, nenhuma versao nova do app chega a quem ja
+ *    esta com ele instalado -- e o aviso de atualizacao daqui nunca dispara.
+ * 3. O `assets/` vai com `immutable` por um ano, porque o Vite poe hash no
+ *    nome de cada bundle: o arquivo daquele nome nunca muda de conteudo.
  */
 
 import { useEffect, useState } from 'react';
