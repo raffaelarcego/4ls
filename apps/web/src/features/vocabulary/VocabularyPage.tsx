@@ -122,7 +122,7 @@ function FilterRow({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+    <div className="hscroll -mx-4 flex gap-2 px-4 pb-1">
       {options.map((option) => (
         <button
           key={option.value}

@@ -218,7 +218,7 @@ export function AnalyticsPage() {
         {(aiUsage.data ?? []).length === 0 ? (
           <p className="text-sm text-hare">Nenhuma chamada de IA registrada ainda.</p>
         ) : (
-          <div className="-mx-2 overflow-x-auto px-2">
+          <div className="hscroll -mx-2 px-2">
             <table className="w-full min-w-[34rem] text-left font-mono text-sm">
               <thead>
                 <tr className="text-xs text-hare">

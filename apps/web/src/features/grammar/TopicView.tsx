@@ -122,7 +122,7 @@ export function TopicView({
       <section className="space-y-2">
         <div
           onScroll={handleColumnScroll}
-          className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1"
+          className="hscroll -mx-4 flex snap-x snap-mandatory gap-2.5 px-4 pb-1"
         >
           {data.columns.map((col) => {
             const label = roleLabel(col);

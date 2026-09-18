@@ -18,6 +18,18 @@
   }
   html {
     -webkit-tap-highlight-color: transparent;
+    /*
+      A pagina nao anda de lado. Nenhuma tela tem conteudo mais largo que a
+      janela -- ja conferido a 360px --, mas no celular dava para arrastar a
+      pagina para o lado assim mesmo e abrir uma faixa vazia: e o elastico do
+      iOS, que ao chegar ao fim de uma faixa rolavel propaga o gesto para o
+      documento.
+
+      `clip` e nao `hidden` de proposito: `hidden` transformaria o <html> em
+      container de rolagem e quebraria o `position: sticky` do cabecalho e das
+      abas. `clip` corta sem criar container.
+    */
+    overflow-x: clip;
   }
   body {
     @apply bg-snow font-sans text-eel antialiased;
@@ -103,5 +115,15 @@
   */
   .tap-target {
     @apply min-h-11 min-w-11;
+  }
+
+  /*
+    Faixa que rola na horizontal de proposito (filtros, tira comparativa,
+    tabela larga). `overscroll-x-contain` e o que impede o gesto de vazar para
+    a pagina quando a faixa chega ao fim -- sem isso, arrastar os filtros
+    balanca a tela inteira de lado no iOS.
+  */
+  .hscroll {
+    @apply overflow-x-auto overscroll-x-contain;
   }
 }
