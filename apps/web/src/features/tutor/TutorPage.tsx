@@ -87,13 +87,11 @@ export function TutorPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-2xl font-black tracking-tight">Tutor 🤖</h1>
-        <p className="text-sm font-semibold text-wolf">
-          Seus erros aqui entram no perfil e voltam como exercício.
-        </p>
+        <h1 className="font-serif text-2xl font-semibold tracking-tight text-eel">Tutor</h1>
+        <p className="text-sm text-wolf">Seus erros aqui entram no perfil e voltam como exercício.</p>
       </header>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="flex gap-4 border-b border-swan pb-0">
         {(languages ?? []).map((language) => {
           const theme = languageTheme(language.code);
           const isActive = languageCode === language.code;
@@ -101,24 +99,28 @@ export function TutorPage() {
             <button
               key={language.code}
               onClick={() => switchLanguage(language.code)}
-              className={`shrink-0 rounded-full border-2 px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
-                isActive
-                  ? `${theme.border} ${theme.soft} ${theme.text}`
-                  : 'border-swan bg-white text-wolf hover:bg-snow'
+              className={`min-w-0 border-b-2 px-1 pb-2.5 text-sm transition ${
+                isActive ? `border-grass ${theme.text} font-medium` : 'border-transparent text-wolf hover:text-eel'
               }`}
             >
-              <span aria-hidden>{theme.flag} </span>
-              {language.name}
+              <span className={`mr-1 font-mono ${theme.text}`}>{theme.mark}</span>
+              {/* No celular so o codigo: com quatro idiomas e o nome inteiro, o
+                  quarto ficava fora da tela -- e como a faixa rola na
+                  horizontal, nada indicava que ele existia. */}
+              <span className="sm:hidden">{language.code.toUpperCase()}</span>
+              <span className="hidden sm:inline">{language.name}</span>
             </button>
           );
         })}
       </div>
 
-      <div className="min-h-[26rem] space-y-3 rounded-2xl border-2 border-swan bg-snow p-4">
+      <div className="min-h-[26rem] space-y-3 rounded-lg border border-swan bg-snow p-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
-            <span className="animate-float text-6xl">{active.flag}</span>
-            <p className="max-w-xs text-sm font-bold text-wolf">
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className={`flex h-14 w-14 items-center justify-center rounded-md border font-mono text-2xl ${active.soft} ${active.border} ${active.text}`}>
+              {active.mark}
+            </span>
+            <p className="max-w-xs text-sm text-wolf">
               Escreva algo no idioma. Errar não é problema — é assim que o sistema descobre o que
               você precisa treinar.
             </p>
@@ -128,7 +130,7 @@ export function TutorPage() {
         {messages.map((message, i) => (
           <div key={i} className={message.role === 'user' ? 'text-right' : ''}>
             <div
-              className={`inline-block max-w-[85%] rounded-2xl border-2 px-4 py-2.5 text-left text-sm font-semibold ${
+              className={`inline-block max-w-[85%] rounded-md border px-4 py-2.5 text-left text-sm ${
                 message.role === 'user'
                   ? 'border-macaw bg-macaw-soft text-macaw-dark'
                   : 'border-swan bg-white text-eel'
@@ -149,15 +151,14 @@ export function TutorPage() {
             )}
 
             {message.correction?.hasErrors && (
-              <div className="mt-2 inline-block max-w-[85%] rounded-2xl border-2 border-bee bg-bee-soft px-4 py-2.5 text-left text-sm">
-                <p className="font-extrabold text-bee-dark">
-                  <span aria-hidden>✏️ </span>
-                  {message.correction.corrected}
-                </p>
+              <div className="mt-2 inline-block max-w-[85%] rounded-md border border-bee bg-bee-soft px-4 py-2.5 text-left text-sm">
+                <p className="font-medium text-bee-dark">{message.correction.corrected}</p>
                 <ul className="mt-1.5 space-y-1">
                   {message.correction.errors.map((error, j) => (
-                    <li key={j} className="text-xs font-semibold text-eel">
-                      <span className="chip mr-1 bg-white/70 text-bee-dark">{error.category}</span>
+                    <li key={j} className="text-xs text-eel">
+                      <span className="chip mr-1 border-bee-dark/30 bg-white/70 text-bee-dark">
+                        {error.category}
+                      </span>
                       {error.explanation ?? error.description}
                     </li>
                   ))}
@@ -167,13 +168,9 @@ export function TutorPage() {
           </div>
         ))}
 
-        {send.isPending && (
-          <p className="flex items-center gap-2 text-sm font-bold text-hare">
-            <span className="animate-float">🦉</span> O tutor está escrevendo...
-          </p>
-        )}
+        {send.isPending && <p className="text-sm text-hare">O tutor está escrevendo...</p>}
         {send.isError && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
+          <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
             {errorMessage(send.error)}
           </p>
         )}
@@ -185,7 +182,7 @@ export function TutorPage() {
           className="input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Escreva no idioma que você está estudando..."
+          placeholder="Escreva no idioma..."
         />
         <button
           type="submit"

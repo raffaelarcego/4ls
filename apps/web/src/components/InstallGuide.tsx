@@ -5,6 +5,7 @@ import {
   useInstall,
   type InstallPlatform,
 } from '../lib/pwa';
+import { CloseIcon } from './Icons';
 
 /**
  * Guia de instalacao do app.
@@ -51,26 +52,23 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border-2 border-swan bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:rounded-3xl sm:pb-5"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-lg border border-swan bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:rounded-lg sm:pb-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start gap-3">
-          <span aria-hidden className="text-4xl">
-            {guide.emoji}
-          </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-black leading-tight">{guide.title}</h2>
-            <p className="text-sm font-semibold text-wolf">{guide.subtitle}</p>
+            <h2 className="font-serif text-xl font-semibold leading-tight text-eel">{guide.title}</h2>
+            <p className="text-sm text-wolf">{guide.subtitle}</p>
           </div>
           <button className="btn-plain px-2 text-sm" onClick={onClose} aria-label="Fechar">
-            ✕
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
 
         {!secure && (
           // Sem HTTPS nenhuma instrucao de menu resolve: o navegador nem
           // oferece a opcao. Dizer isso evita a busca por um item inexistente.
-          <p className="mb-4 rounded-2xl border-2 border-cardinal bg-cardinal-soft px-3.5 py-3 text-sm font-bold text-cardinal-dark">
+          <p className="mb-4 rounded-md border border-cardinal bg-cardinal-soft px-3.5 py-3 text-sm text-cardinal-dark">
             Este endereço não está em HTTPS, e sem isso nenhum navegador instala o app. Acesse
             pelo endereço oficial (https://…) e tente de novo.
           </p>
@@ -80,26 +78,21 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
           <ol className="mb-4 space-y-2.5">
             {guide.steps.map((step, i) => (
               <li key={step} className="flex gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-macaw text-xs font-black text-white">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-grass font-mono text-xs text-grass">
                   {i + 1}
                 </span>
                 {/* O HTML vem de GUIDES, uma constante deste arquivo -- nada
                     de fora entra aqui. E so <strong>, e ele importa: o aluno
                     procura o item de menu pelo nome exato, e o nome precisa
                     saltar da frase. */}
-                <span
-                  className="text-sm font-bold leading-snug"
-                  dangerouslySetInnerHTML={{ __html: step }}
-                />
+                <span className="text-sm leading-snug text-eel" dangerouslySetInnerHTML={{ __html: step }} />
               </li>
             ))}
           </ol>
         )}
 
         {guide.note && (
-          <p className="mb-4 rounded-2xl bg-snow px-3.5 py-3 text-sm font-semibold text-wolf">
-            {guide.note}
-          </p>
+          <p className="mb-4 rounded-md bg-swan/40 px-3.5 py-3 text-sm text-wolf">{guide.note}</p>
         )}
 
         {platform === 'in-app' && <CopyLink />}
@@ -131,7 +124,7 @@ function CopyLink() {
 
   return (
     <div className="mb-4 space-y-2">
-      <p className="truncate rounded-xl border-2 border-swan bg-snow px-3 py-2.5 text-sm font-bold">
+      <p className="truncate rounded-md border border-swan bg-snow px-3 py-2.5 font-mono text-sm text-eel">
         {url}
       </p>
       <button

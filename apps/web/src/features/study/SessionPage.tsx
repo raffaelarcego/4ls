@@ -170,10 +170,10 @@ export function SessionPage() {
         <>
           <button
             onClick={() => navigate('/')}
-            className="shrink-0 rounded-xl p-1.5 text-hare transition hover:bg-snow hover:text-wolf"
+            className="tap-target -ml-2 flex shrink-0 items-center justify-center rounded-md text-hare transition-colors hover:bg-snow hover:text-wolf"
             aria-label="Sair da sessão"
           >
-            <CloseIcon className="h-7 w-7" />
+            <CloseIcon className="h-6 w-6" />
           </button>
           <ProgressBar value={done} max={total} size="lg" />
           <span
@@ -186,27 +186,26 @@ export function SessionPage() {
         </>
       }
     >
-      <div className="space-y-5 pb-44">
+      <div className="lesson-pad space-y-5">
         <div className="flex items-center gap-3">
           <span
-            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 text-2xl ${language.soft} ${language.border}`}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md border font-mono text-lg ${language.soft} ${language.border} ${language.text}`}
           >
-            {theme.emoji}
+            {language.mark}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-black">
-              {theme.label} · {current.languageName}
+            <h1 className="truncate font-serif text-lg font-semibold text-eel">
+              {theme.label}, {current.languageName}
             </h1>
-            <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
-              bloco {session.activities.findIndex((a) => a.id === current.id) + 1} de {total} ·{' '}
-              {PILLAR_LABEL[current.pillar] ?? current.pillar} · {current.plannedMinutes} min
+            <p className="font-mono text-xs text-hare">
+              bloco {session.activities.findIndex((a) => a.id === current.id) + 1} de {total},{' '}
+              {PILLAR_LABEL[current.pillar] ?? current.pillar}, {current.plannedMinutes} min
             </p>
           </div>
         </div>
 
         {current.reason && (
-          <p className="rounded-2xl bg-snow px-4 py-3 text-sm font-semibold text-wolf">
-            <span aria-hidden>🎯 </span>
+          <p className="border-l-2 border-swan pl-3 font-serif text-sm italic leading-snug text-wolf">
             {current.reason}
           </p>
         )}
@@ -232,9 +231,11 @@ export function SessionPage() {
 /** Sessao roda em tela cheia, sem a navegacao do app: um bloco por vez. */
 function Shell({ header, children }: { header?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-white">
+    // 100dvh, e nao 100vh: no celular a barra de endereco entra e sai, e com
+    // `vh` a tela fica mais alta que o visivel e o fim do conteudo some.
+    <div className="min-h-[100dvh] bg-white">
       {header && (
-        <header className="sticky top-0 z-10 border-b-2 border-swan bg-white">
+        <header className="sticky top-0 z-10 border-b border-swan bg-white pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">{header}</div>
         </header>
       )}
@@ -245,9 +246,9 @@ function Shell({ header, children }: { header?: React.ReactNode; children: React
 
 function Trophy({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className={`flex-1 rounded-2xl border-2 bg-white p-3 ${tone}`}>
-      <p className="text-2xl font-black tabular-nums">{value}</p>
-      <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">{label}</p>
+    <div className={`flex-1 rounded-lg border bg-white p-3 ${tone}`}>
+      <p className="font-mono text-xl tabular-nums text-eel">{value}</p>
+      <p className="text-[11px] leading-tight text-hare">{label}</p>
     </div>
   );
 }

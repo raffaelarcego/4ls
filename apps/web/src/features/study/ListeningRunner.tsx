@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
+import { AnswerOption } from '../../components/AnswerOption';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { useSpeaker } from '../../lib/speech';
 import { api, errorMessage } from '../../services/api';
@@ -80,13 +81,10 @@ export function ListeningRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className={`text-6xl ${generate.isPending ? 'animate-float' : ''}`}>
-            {generate.isError ? '🔌' : '🎧'}
-          </span>
-          <p className="text-lg font-black">
+          <p className="font-serif text-lg font-semibold text-eel">
             {generate.isPending ? 'Escrevendo o diálogo...' : 'Escuta sob medida'}
           </p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {generate.isError
               ? errorMessage(generate.error)
               : 'Um diálogo curto no seu nível, falado em voz alta, com perguntas de compreensão no fim.'}
@@ -94,9 +92,7 @@ export function ListeningRunner({
         </div>
 
         <LessonFooter tone={generate.isError ? 'wrong' : 'neutral'}>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => generate.mutate()}
@@ -121,24 +117,23 @@ export function ListeningRunner({
 
             <button
               onClick={() => (speaker.isSpeaking ? speaker.stop() : void playAll(listening.lines))}
-              className={`mx-auto flex h-28 w-28 items-center justify-center rounded-full border-2 border-b-[6px] text-5xl transition active:translate-y-[3px] active:border-b-2 ${
+              className={`btn mx-auto w-full max-w-xs ${
                 speaker.isSpeaking
-                  ? 'border-macaw-dark bg-macaw text-white'
-                  : 'border-macaw bg-macaw-soft'
+                  ? 'border-macaw-dark bg-macaw text-snow'
+                  : 'border-macaw bg-macaw-soft text-macaw-dark'
               }`}
-              aria-label={speaker.isSpeaking ? 'Parar' : 'Tocar o diálogo'}
             >
-              {speaker.isSpeaking ? '⏸️' : '▶️'}
+              {speaker.isSpeaking ? 'Parar' : playCount === 0 ? 'Ouvir o diálogo' : 'Ouvir de novo'}
             </button>
 
-            <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
+            <p className="font-mono text-xs text-hare">
               {playCount === 0
-                ? 'toque para ouvir'
+                ? 'ainda não ouviu'
                 : `${playCount} ${playCount === 1 ? 'escuta' : 'escutas'}`}
             </p>
 
             {!speaker.naturalVoice && (
-              <p className="text-xs font-semibold text-hare">
+              <p className="text-xs text-hare">
                 Usando a voz do navegador — configure um provider de voz no backend para ouvir uma
                 voz natural.
               </p>
@@ -151,7 +146,7 @@ export function ListeningRunner({
               {listening.lines.map((line, i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-mono text-xs ${
                       i % 2 === 0
                         ? 'bg-macaw-soft text-macaw-dark'
                         : 'bg-humpback-soft text-humpback-dark'
@@ -160,8 +155,10 @@ export function ListeningRunner({
                     {line.speaker}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold">{line.text}</p>
-                    <p className="text-xs font-semibold text-wolf">{line.translation}</p>
+                    <p lang={activity.languageCode} className="font-medium">
+                      {line.text}
+                    </p>
+                    <p className="text-xs text-wolf">{line.translation}</p>
                   </div>
                   <AudioButton
                     text={line.text}
@@ -182,8 +179,10 @@ export function ListeningRunner({
               <p className="section-title mb-2">Palavras do diálogo</p>
               <ul className="space-y-1">
                 {listening.vocabulary.map((item) => (
-                  <li key={item.term} className="text-sm font-semibold">
-                    <span className="font-black">{item.term}</span>{' '}
+                  <li key={item.term} className="text-sm">
+                    <span lang={activity.languageCode} className="font-semibold">
+                      {item.term}
+                    </span>{' '}
                     <span className="text-wolf">— {item.meaning}</span>
                   </li>
                 ))}
@@ -197,9 +196,7 @@ export function ListeningRunner({
             playCount === 0 ? 'Ouça pelo menos uma vez antes de responder.' : undefined
           }
         >
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => {
@@ -221,9 +218,8 @@ export function ListeningRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">🎧</span>
-          <p className="text-xl font-black">Escuta concluída</p>
-          <p className="text-sm font-semibold text-wolf">
+          <p className="font-serif text-xl font-semibold text-eel">Escuta concluída</p>
+          <p className="text-sm text-wolf">
             Você ouviu {playCount} {playCount === 1 ? 'vez' : 'vezes'}.
           </p>
         </div>
@@ -243,11 +239,10 @@ export function ListeningRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
+          <p className="font-serif text-xl font-semibold text-eel">
             {correct} de {listening.questions.length} acertos
           </p>
-          <p className="text-sm font-semibold text-wolf">
+          <p className="text-sm text-wolf">
             {score >= 70
               ? 'Seu ouvido pegou o essencial.'
               : 'Vale reouvir este diálogo amanhã — ele fica no cache.'}
@@ -276,81 +271,78 @@ export function ListeningRunner({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={listening.questions.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{listening.questions.length}
           </span>
         </div>
 
         <div className="flex items-start gap-3">
-          <p className="flex-1 text-xl font-black leading-snug">{question.prompt}</p>
+          <p lang={activity.languageCode} className="min-w-0 flex-1 text-xl font-medium leading-snug">
+            {question.prompt}
+          </p>
           <AudioButton text={question.prompt} languageCode={activity.languageCode} />
         </div>
 
-        <div className="grid gap-2.5">
-          {question.options.map((option, i) => {
-            const selected = answer === option;
-            const state = !checked
-              ? selected
-                ? 'border-macaw bg-macaw-soft text-macaw-dark'
-                : 'border-swan bg-white hover:bg-snow'
-              : option === question.answer
-                ? 'border-grass bg-grass-soft text-grass-dark'
-                : selected
-                  ? 'border-cardinal bg-cardinal-soft text-cardinal-dark'
-                  : 'border-swan bg-white text-hare';
-
-            return (
-              <button
-                key={option}
-                onClick={() => !checked && setAnswer(option)}
-                disabled={checked}
-                className={`flex items-center gap-3 rounded-2xl border-2 border-b-[4px] px-4 py-3.5 text-left font-bold transition active:translate-y-[2px] active:border-b-2 ${state}`}
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-current text-xs font-black opacity-60">
-                  {i + 1}
-                </span>
-                {option}
-              </button>
-            );
-          })}
-        </div>
-
+        {/*
+          Reouvir fica ACIMA das alternativas: entre elas e o rodape fixo, o
+          botao caia embaixo da barra e ficava intocavel justo em quem nao
+          entendeu o dialogo.
+        */}
         <button
-          className="btn-ghost w-full text-xs"
+          className="btn-ghost w-full"
           onClick={() => void playAll(listening.lines)}
           disabled={speaker.isSpeaking}
         >
           Ouvir o diálogo de novo
         </button>
+
+        <div className="grid gap-2.5">
+          {question.options.map((option) => (
+            <AnswerOption
+              key={option}
+              lang={activity.languageCode}
+              disabled={checked}
+              state={
+                !checked
+                  ? 'idle'
+                  : option === question.answer
+                    ? 'correct'
+                    : answer === option
+                      ? 'wrong'
+                      : 'idle'
+              }
+              // Tocar ja corrige: o "Verificar" no rodape era um terceiro toque
+              // que nao decidia nada.
+              onClick={() => {
+                if (checked) return;
+                setAnswer(option);
+                setChecked(true);
+              }}
+            >
+              {option}
+            </AnswerOption>
+          ))}
+        </div>
       </div>
 
-      {checked ? (
-        <LessonFooter
-          tone={isCorrect ? 'correct' : 'wrong'}
-          title={isCorrect ? 'Isso mesmo!' : `Resposta certa: ${question.answer}`}
-          detail={question.explanation}
+      {/*
+        O rodape mantem os mesmos dois botoes nos dois estados, para o primario
+        nao trocar de lugar debaixo do polegar quando o resultado aparece.
+      */}
+      <LessonFooter
+        tone={checked ? (isCorrect ? 'correct' : 'wrong') : 'neutral'}
+        title={checked ? (isCorrect ? 'Isso mesmo' : `Resposta certa: ${question.answer}`) : undefined}
+        detail={checked ? question.explanation : 'Toque na alternativa para responder.'}
+      >
+        <SkipButton onSkip={onSkip} />
+        <button
+          className="btn-primary flex-1 px-10 sm:flex-none"
+          onClick={next}
+          disabled={!checked}
         >
-          <button
-            className={`${isCorrect ? 'btn-primary' : 'btn-danger'} flex-1 px-10 sm:flex-none`}
-            onClick={next}
-          >
-            Continuar
-          </button>
-        </LessonFooter>
-      ) : (
-        <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
-          <button
-            className="btn-primary flex-1 px-10 sm:flex-none"
-            onClick={() => setChecked(true)}
-            disabled={!answer}
-          >
-            Verificar
-          </button>
-        </LessonFooter>
-      )}
+          Continuar
+        </button>
+      </LessonFooter>
     </>
   );
 }

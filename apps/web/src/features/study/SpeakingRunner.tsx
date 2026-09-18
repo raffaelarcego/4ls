@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
+import { AnswerTextarea } from '../../components/AnswerField';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import {
   browserCanRecognize,
   recognizeInBrowser,
@@ -139,13 +140,10 @@ export function SpeakingRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className={`text-6xl ${generateMission.isPending ? 'animate-float' : ''}`}>
-            {generateMission.isError ? '🔌' : '🗣️'}
-          </span>
-          <p className="text-lg font-black">
+          <p className="font-serif text-lg font-semibold text-eel">
             {generateMission.isPending ? 'Pensando numa missão...' : 'Speaking Lab'}
           </p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {generateMission.isError
               ? errorMessage(generateMission.error)
               : 'Você recebe uma missão, fala por 20 a 40 segundos e é corrigido.'}
@@ -153,9 +151,7 @@ export function SpeakingRunner({
         </div>
 
         <LessonFooter tone={generateMission.isError ? 'wrong' : 'neutral'}>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => generateMission.mutate()}
@@ -177,19 +173,18 @@ export function SpeakingRunner({
     const score = evaluation.average;
     return (
       <>
-        <div className="space-y-4">
+        <div className="lesson-pad space-y-4">
           <div className="card flex flex-col items-center gap-2 text-center">
-            <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-            <p className="text-3xl font-black tabular-nums">{score}%</p>
-            <p className="text-sm font-semibold text-wolf">{evaluation.feedback}</p>
+            <p className="font-mono text-3xl text-eel">{score}%</p>
+            <p className="text-sm text-wolf">{evaluation.feedback}</p>
           </div>
 
           <div className="card space-y-2">
             <p className="section-title">Notas</p>
             {(Object.keys(SCORE_LABEL) as Array<keyof Evaluation['scores']>).map((key) => (
-              <div key={key} className="flex items-center justify-between text-sm font-bold">
+              <div key={key} className="flex items-center justify-between text-sm">
                 <span className="text-wolf">{SCORE_LABEL[key]}</span>
-                <span className="tabular-nums">{Math.round(evaluation.scores[key])}%</span>
+                <span className="font-mono">{Math.round(evaluation.scores[key])}%</span>
               </div>
             ))}
           </div>
@@ -197,12 +192,18 @@ export function SpeakingRunner({
           <div className="card space-y-2">
             <p className="section-title">Como um nativo diria</p>
             <div className="flex items-start gap-2">
-              <p className="flex-1 font-bold">{evaluation.corrected}</p>
+              {/* `min-w-0`: sem ele a frase corrigida empurra o botao de audio
+                  para fora da tela num aparelho estreito. */}
+              <p lang={activity.languageCode} className="min-w-0 flex-1 font-medium">
+                {evaluation.corrected}
+              </p>
               <AudioButton text={evaluation.corrected} languageCode={activity.languageCode} />
             </div>
-            <div className="rounded-xl bg-snow p-3">
+            <div className="rounded-md bg-snow p-3">
               <p className="section-title mb-1">Você disse</p>
-              <p className="text-sm font-semibold text-wolf">{transcript}</p>
+              <p lang={activity.languageCode} className="text-sm text-wolf">
+                {transcript}
+              </p>
             </div>
           </div>
         </div>
@@ -218,15 +219,26 @@ export function SpeakingRunner({
 
   // ----- gravacao -----
   const recording = serverStt ? recorder.isRecording : busy === 'gravando';
+  // Falha do microfone, da transcricao ou da avaliacao: para o aluno e tudo "nao
+  // deu certo", e todas precisam chegar no mesmo lugar -- o rodape.
+  const problem =
+    recorder.error ?? failure ?? (evaluate.isError ? errorMessage(evaluate.error) : null);
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="lesson-pad space-y-4">
         <div className="card space-y-3">
           <p className="section-title">Sua missão</p>
-          <p className="text-lg font-black leading-snug">{mission.mission}</p>
-          <div className="flex items-start gap-2 rounded-xl bg-snow p-3">
-            <p className="flex-1 text-sm font-bold text-wolf">{mission.promptInTarget}</p>
+          <p className="font-serif text-lg font-semibold leading-snug text-eel">
+            {mission.mission}
+          </p>
+          <div className="flex items-start gap-2 rounded-md bg-snow p-3">
+            <p
+              lang={activity.languageCode}
+              className="min-w-0 flex-1 text-sm font-medium text-wolf"
+            >
+              {mission.promptInTarget}
+            </p>
             <AudioButton
               text={mission.promptInTarget}
               languageCode={activity.languageCode}
@@ -244,33 +256,66 @@ export function SpeakingRunner({
           )}
         </div>
 
+        {/*
+          A transcricao vem ANTES do botao de gravar assim que existe texto.
+          Ela nasce embaixo de um controle de 112px de altura, entao editar no
+          celular era: tocar no campo, o teclado sobe, o campo fica atras do
+          teclado e do rodape fixo, rolar as cegas. Acima, ela ja esta na
+          metade visivel da tela quando o teclado abre -- e o botao de gravar,
+          que a essa altura so serve para refazer, desce.
+        */}
+        {(transcript || !canRecord) && (
+          <div className="space-y-1.5">
+            <p className="section-title">
+              {canRecord ? 'O que eu ouvi (edite se saiu errado)' : 'O que você falou'}
+            </p>
+            {/* `AnswerTextarea` e nao um textarea cru: o teclado em portugues
+                "corrigia" o que o aluno falou no idioma estudado e a avaliacao
+                recebia outra frase. */}
+            <AnswerTextarea
+              value={transcript}
+              onChange={setTranscript}
+              languageCode={activity.languageCode}
+              rows={4}
+              placeholder={`Escreva em ${activity.languageName}...`}
+            />
+          </div>
+        )}
+
         {canRecord ? (
           <div className="card flex flex-col items-center gap-3 text-center">
             <button
               onClick={() => (recording ? void stopRecording() : void startRecording())}
               disabled={busy === 'transcrevendo'}
-              className={`flex h-28 w-28 items-center justify-center rounded-full border-2 border-b-[6px] text-5xl transition active:translate-y-[3px] active:border-b-2 ${
-                recording
-                  ? 'animate-pulse border-cardinal-dark bg-cardinal text-white'
-                  : 'border-cardinal bg-cardinal-soft'
+              className={`flex h-24 w-24 items-center justify-center rounded-full border transition-colors ${
+                recording ? 'border-cardinal-dark bg-cardinal' : 'border-cardinal bg-cardinal-soft'
               }`}
               aria-label={recording ? 'Parar de gravar' : 'Começar a gravar'}
             >
-              {recording ? '⏹️' : '🎙️'}
+              <span
+                aria-hidden
+                className={
+                  recording
+                    ? 'h-7 w-7 rounded-sm bg-snow'
+                    : 'h-8 w-8 animate-none rounded-full bg-cardinal'
+                }
+              />
             </button>
 
-            <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
+            <p className="text-xs text-hare">
               {busy === 'transcrevendo'
-                ? 'transcrevendo...'
+                ? 'Transcrevendo...'
                 : recording
                   ? serverStt
-                    ? `gravando · ${recorder.seconds}s`
-                    : 'ouvindo... toque para parar'
-                  : 'toque e fale'}
+                    ? `Gravando · ${recorder.seconds}s`
+                    : 'Ouvindo... toque para parar'
+                  : transcript
+                    ? 'Toque para gravar de novo'
+                    : 'Toque e fale'}
             </p>
 
             {!serverStt && (
-              <p className="text-xs font-semibold text-hare">
+              <p className="text-xs text-hare">
                 Usando o reconhecimento de fala do navegador (só Chrome/Edge). Configure
                 SPEECH_API_KEY no backend para transcrição própria.
               </p>
@@ -279,52 +324,33 @@ export function SpeakingRunner({
         ) : (
           <div className="card space-y-2">
             <p className="section-title">Sem microfone disponível</p>
-            <p className="text-sm font-semibold text-wolf">
-              Este navegador não grava áudio nem reconhece fala. Fale em voz alta e escreva abaixo o
+            <p className="text-sm text-wolf">
+              Este navegador não grava áudio nem reconhece fala. Fale em voz alta e escreva acima o
               que você disse — a correção é a mesma.
             </p>
           </div>
         )}
-
-        {(recorder.error || failure) && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
-            {recorder.error ?? failure}
-          </p>
-        )}
-
-        {(transcript || !canRecord) && (
-          <div className="space-y-1.5">
-            <p className="section-title">
-              {canRecord ? 'O que eu ouvi (edite se saiu errado)' : 'O que você falou'}
-            </p>
-            <textarea
-              className="input min-h-24 resize-y"
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              placeholder={`Escreva em ${activity.languageName}...`}
-            />
-          </div>
-        )}
-
-        {evaluate.isError && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
-            {errorMessage(evaluate.error)}
-          </p>
-        )}
       </div>
 
+      {/*
+        As falhas ("não saiu áudio", erro da avaliação) ficavam como paragrafos
+        soltos no meio da pagina, fora do campo de visao de quem acabou de tocar
+        no botao do rodape -- o aluno via a acao nao acontecer e nao via o
+        porque. Agora elas aparecem onde ele ja esta olhando.
+      */}
       <LessonFooter
+        tone={problem ? 'wrong' : 'neutral'}
+        title={problem ? 'Não deu certo' : undefined}
         detail={
-          transcript.trim()
+          problem ??
+          (transcript.trim()
             ? undefined
             : canRecord
               ? 'Grave sua fala para receber a correção.'
-              : 'Escreva o que você falou para receber a correção.'
+              : 'Escreva o que você falou para receber a correção.')
         }
       >
-        <button className="btn-plain" onClick={onSkip}>
-          Pular bloco
-        </button>
+        <SkipButton onSkip={onSkip} />
         <button
           className="btn-primary flex-1 px-10 sm:flex-none"
           onClick={() => evaluate.mutate(transcript.trim())}

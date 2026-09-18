@@ -26,12 +26,7 @@ export function InstallPrompt() {
   if (banner === 'update') {
     return (
       <BannerShell tone="border-macaw bg-macaw-soft">
-        <span aria-hidden className="text-2xl">
-          ✨
-        </span>
-        <p className="min-w-0 flex-1 text-sm font-extrabold text-macaw-dark">
-          Tem uma versão nova do 4L.
-        </p>
+        <p className="min-w-0 flex-1 text-sm font-medium text-macaw-dark">Tem uma versão nova do 4L.</p>
         <button className="btn-blue shrink-0 px-5 py-2 text-sm" onClick={applyUpdate}>
           Atualizar
         </button>
@@ -41,14 +36,12 @@ export function InstallPrompt() {
 
   return (
     <BannerShell tone="border-swan bg-white">
-      <span aria-hidden className="text-2xl">
-        📲
-      </span>
-      <p className="min-w-0 flex-1 truncate text-sm font-extrabold">
-        Instale o 4L no celular
-        <span className="hidden text-xs font-bold text-hare sm:block">
-          Abre em tela cheia, direto da tela de início.
-        </span>
+      {/* "Instale o 4L no celular" nao cabia ao lado do botao e chegava ao
+          aluno como "Instale o 4L no ...". Texto curto o bastante para nunca
+          truncar; o detalhe fica para o guia, que tem a tela inteira. */}
+      <p className="min-w-0 flex-1 truncate text-sm font-medium text-eel">
+        Instalar o app
+        <span className="hidden text-xs text-hare sm:block">Abre em tela cheia, direto da tela de início.</span>
       </p>
       <button className="btn-primary shrink-0 px-5 py-2 text-sm" onClick={() => setShowGuide(true)}>
         Instalar
@@ -81,7 +74,7 @@ export function InstallPrompt() {
 function BannerShell({ tone, children }: { tone: string; children: React.ReactNode }) {
   return (
     <div
-      className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-y-2 px-4 py-2.5 lg:bottom-0 lg:border-b-0 ${tone}`}
+      className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-y px-4 py-2.5 lg:bottom-0 lg:border-b-0 ${tone}`}
     >
       <div className="mx-auto flex max-w-3xl items-center gap-2.5">{children}</div>
     </div>
@@ -110,12 +103,10 @@ export function InstallButton({ className = '' }: { className?: string }) {
         onClick={() => setShowGuide(true)}
         aria-label="Instalar o app"
         title="Instalar o app"
-        className={`flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-b-[3px] border-grass bg-grass-soft px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-grass-dark transition active:translate-y-[1px] active:border-b-2 ${className}`}
+        className={`flex shrink-0 items-center gap-1.5 rounded-md border border-grass bg-grass-soft px-2.5 py-1.5 text-xs font-medium text-grass-dark transition hover:bg-grass hover:text-snow ${className}`}
       >
-        <span aria-hidden className="text-base leading-none">
-          📲
-        </span>
         <span className="hidden sm:inline">Instalar</span>
+        <span className="sm:hidden">Instalar app</span>
       </button>
 
       {showGuide && <InstallGuide onClose={() => setShowGuide(false)} />}

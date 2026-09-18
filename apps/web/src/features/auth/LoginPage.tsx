@@ -29,11 +29,9 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-5 py-10">
       <div className="text-center">
-        <span className="animate-float inline-block text-6xl">🦉</span>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-grass">
-          4L<span className="text-macaw">.</span>
-        </h1>
-        <p className="text-sm font-bold text-wolf">Três idiomas. Uma hora por dia.</p>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-eel">4L</h1>
+        <p className="mt-1 font-mono text-xs text-hare">diário de bordo</p>
+        <p className="mt-2 text-sm text-wolf">Quatro idiomas. Uma hora por dia.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="card w-full max-w-sm space-y-4">
@@ -60,7 +58,7 @@ export function LoginPage() {
         </div>
 
         {mutation.isError && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
+          <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
             {errorMessage(mutation.error)}
           </p>
         )}
@@ -69,7 +67,7 @@ export function LoginPage() {
           {mutation.isPending ? 'Entrando...' : 'Entrar'}
         </button>
 
-        <p className="text-center text-sm font-bold text-wolf">
+        <p className="text-center text-sm text-wolf">
           Ainda não tem conta?{' '}
           <Link to="/register" className="text-macaw hover:underline">
             Criar conta

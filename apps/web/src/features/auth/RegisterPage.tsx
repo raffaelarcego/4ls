@@ -30,13 +30,9 @@ export function RegisterPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-5 py-10">
       <div className="text-center">
-        <span className="animate-float inline-block text-6xl">🦉</span>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-grass">
-          4L<span className="text-macaw">.</span>
-        </h1>
-        <p className="text-sm font-bold text-wolf">
-          Sua conta já começa com 🇬🇧 🇪🇸 🇩🇪 🇷🇺 configurados.
-        </p>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-eel">4L</h1>
+        <p className="mt-1 font-mono text-xs text-hare">diário de bordo</p>
+        <p className="mt-2 text-sm text-wolf">Sua conta já começa com inglês, espanhol, alemão e russo.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="card w-full max-w-sm space-y-4">
@@ -66,11 +62,11 @@ export function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          <p className="mt-1 text-xs font-bold text-hare">Mínimo de 8 caracteres.</p>
+          <p className="mt-1 text-xs text-hare">Mínimo de 8 caracteres.</p>
         </div>
 
         {mutation.isError && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
+          <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
             {errorMessage(mutation.error)}
           </p>
         )}
@@ -79,7 +75,7 @@ export function RegisterPage() {
           {mutation.isPending ? 'Criando...' : 'Criar conta'}
         </button>
 
-        <p className="text-center text-sm font-bold text-wolf">
+        <p className="text-center text-sm text-wolf">
           Já tem conta?{' '}
           <Link to="/login" className="text-macaw hover:underline">
             Entrar

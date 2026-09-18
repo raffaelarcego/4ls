@@ -4,43 +4,50 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Paleta no espirito do Duolingo: fundo claro, cores solidas e saturadas.
-        // Cada cor "forte" tem um par "-dark" (usado como sombra 3D dos botoes)
-        // e um par "-soft" (usado como fundo de destaque).
-        snow: '#F7F7F7',
-        swan: '#E5E5E5',
-        hare: '#AFAFAF',
-        wolf: '#777777',
-        eel: '#3C3C3C',
+        // Diario de bordo: papel envelhecido, tinta e acentos foscos --
+        // um instrumento pessoal, nao uma vitrine de jogo.
+        // Os mesmos nomes de token seguem em uso; so a cor por tras mudou.
+        snow: '#F5F1E6',
+        swan: '#E4DCC8',
+        hare: '#A79C86',
+        wolf: '#6B6252',
+        eel: '#22201A',
 
-        grass: '#58CC02',
-        'grass-dark': '#4CAD02',
-        'grass-soft': '#D7FFB8',
+        grass: '#22344A',
+        'grass-dark': '#182535',
+        'grass-soft': '#DCE2E8',
 
-        macaw: '#1CB0F6',
-        'macaw-dark': '#1899D6',
-        'macaw-soft': '#DDF4FF',
+        macaw: '#3E6A8F',
+        'macaw-dark': '#2F5470',
+        'macaw-soft': '#DCE9F0',
 
-        cardinal: '#FF4B4B',
-        'cardinal-dark': '#E33131',
-        'cardinal-soft': '#FFDFE0',
+        cardinal: '#8C4A3A',
+        'cardinal-dark': '#6E392C',
+        'cardinal-soft': '#EAD9D2',
 
-        bee: '#FFC800',
-        'bee-dark': '#E5A600',
-        'bee-soft': '#FFF4D4',
+        bee: '#B3822B',
+        'bee-dark': '#8F6620',
+        'bee-soft': '#F0E3C8',
 
-        beak: '#FF9600',
-        humpback: '#CE82FF',
-        'humpback-dark': '#A568CC',
-        'humpback-soft': '#F7E9FF',
+        beak: '#B08D57',
+        humpback: '#6B2C39',
+        'humpback-dark': '#54212B',
+        'humpback-soft': '#E8D9DB',
+
+        // Verde-floresta reservado ao aleman, para nao colidir com o
+        // vermelho de erro (cardinal).
+        forest: '#3E5C4E',
+        'forest-dark': '#2E463B',
+        'forest-soft': '#DCE5DE',
       },
       fontFamily: {
-        sans: ['Nunito', 'ui-rounded', 'Segoe UI', 'system-ui', 'sans-serif'],
-        display: ['Nunito', 'ui-rounded', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['"Source Serif 4"', 'Georgia', 'serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {
-        xl: '1rem',
-        '2xl': '1.25rem',
+        xl: '0.5rem',
+        '2xl': '0.75rem',
       },
       keyframes: {
         pop: {

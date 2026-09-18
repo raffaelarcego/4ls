@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+﻿import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { AnswerTextarea } from '../../components/AnswerField';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
 import { ProductionEvaluation, ProductionMission, SessionActivity } from '../../types';
@@ -20,9 +21,16 @@ import { ProductionEvaluation, ProductionMission, SessionActivity } from '../../
  *    palavra -- o flashcard ja faz isso. Esta sendo testado em construir a
  *    frase em volta dela: a ordem, o caso, a preposicao, o que cada lingua
  *    obriga. Esconder o termo devolveria isto ao terreno do vocabulario.
- * 2. As quatro caixas ficam na MESMA tela, visiveis ao mesmo tempo. E
- *    desconfortavel de proposito: e essa visao lado a lado que faz o aluno
- *    perceber sozinho que escreveu a frase alema com a ordem do russo.
+ * 2. A comparacao lado a lado e o coracao do bloco: e ela que faz o aluno
+ *    perceber sozinho que escreveu a frase alema com a ordem do russo. Ela
+ *    acontece na REVISAO, com as quatro ja escritas -- e nao enquanto digita.
+ *
+ *    As quatro caixas ficavam juntas na mesma tela desde o inicio, e no celular
+ *    isso nao entregava comparacao nenhuma: comparar duas caixas vazias nao
+ *    ensina nada, e o teclado cobria a terceira e a quarta junto com o rodape,
+ *    entao escrever em russo era digitar as cegas. Escrevendo um idioma por vez
+ *    o teclado nunca disputa espaco, e as frases ja escritas ficam visiveis
+ *    acima como apoio -- que e o andaime comparativo de verdade.
  */
 export function ProductionRunner({
   activity,
@@ -35,6 +43,8 @@ export function ProductionRunner({
 }) {
   const [sentences, setSentences] = useState<Record<string, string>>({});
   const [evaluation, setEvaluation] = useState<ProductionEvaluation | null>(null);
+  /** Idioma sendo escrito. Igual a quantidade de alvos = tela de revisao. */
+  const [step, setStep] = useState(0);
 
   const mission = useQuery<ProductionMission>({
     queryKey: ['concepts', 'production'],
@@ -59,9 +69,8 @@ export function ProductionRunner({
   if (mission.isPending) {
     return (
       <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-        <span className="animate-float text-6xl">🎤</span>
-        <p className="text-lg font-black">Escolhendo o conceito...</p>
-        <p className="max-w-sm text-sm font-semibold text-wolf">
+        <p className="font-serif text-lg font-semibold text-eel">Escolhendo o conceito...</p>
+        <p className="max-w-sm text-sm text-wolf">
           Vai ser um que você já domina — produção livre só mede o que assentou.
         </p>
       </div>
@@ -72,11 +81,8 @@ export function ProductionRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className="text-6xl">🌱</span>
-          <p className="text-lg font-black">Ainda não</p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
-            {errorMessage(mission.error)}
-          </p>
+          <p className="font-serif text-lg font-semibold text-eel">Ainda não</p>
+          <p className="max-w-sm text-sm text-wolf">{errorMessage(mission.error)}</p>
         </div>
         <LessonFooter tone="neutral">
           <button className="btn-primary px-8" onClick={onSkip}>
@@ -91,74 +97,158 @@ export function ProductionRunner({
     return <Result evaluation={evaluation} onFinish={onFinish} />;
   }
 
-  const written = mission.data.targets.filter((t) => (sentences[t.languageCode] ?? '').trim());
+  const targets = mission.data.targets;
+  const written = targets.filter((t) => (sentences[t.languageCode] ?? '').trim());
+  const reviewing = step >= targets.length;
+  const target = targets[step];
+
+  const gloss = (
+    <div className="card space-y-1.5">
+      <p className="text-xs text-hare">Escreva isto em todos os idiomas</p>
+      <h2 className="font-serif text-2xl font-semibold leading-tight text-eel">
+        {mission.data.gloss}
+      </h2>
+    </div>
+  );
+
+  /** Trilha dos quatro idiomas: onde ele esta e o que ja escreveu. */
+  const trail = (
+    <div className="flex gap-2">
+      {targets.map((t, i) => {
+        const theme = languageTheme(t.languageCode);
+        const done = (sentences[t.languageCode] ?? '').trim().length > 0;
+        const here = i === step;
+        return (
+          <button
+            key={t.languageCode}
+            onClick={() => setStep(i)}
+            aria-label={t.languageName}
+            className={`tap-target flex flex-1 items-center justify-center rounded-md border font-mono text-base transition-colors ${
+              here
+                ? `${theme.border} ${theme.soft} ${theme.text}`
+                : done
+                  ? 'border-swan bg-white text-eel'
+                  : 'border-swan bg-snow text-hare'
+            }`}
+          >
+            {theme.mark}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (reviewing) {
+    return (
+      <>
+        <div className="space-y-4">
+          {gloss}
+          {trail}
+
+          {/*
+            Aqui as quatro ficam juntas de novo, e agora a comparacao rende:
+            todas escritas, lado a lado, antes de mandar corrigir.
+          */}
+          {targets.map((t) => {
+            const theme = languageTheme(t.languageCode);
+            return (
+              <div key={t.languageCode} className={`rounded-lg border p-3 ${theme.border}`}>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className={`font-mono ${theme.text}`}>{theme.mark}</span>
+                  <span className="text-sm font-medium text-eel">{t.term}</span>
+                  <span className="min-w-0 truncate text-xs text-hare">{t.meaning}</span>
+                </div>
+                <AnswerTextarea
+                  value={sentences[t.languageCode] ?? ''}
+                  onChange={(v) => setSentences((s) => ({ ...s, [t.languageCode]: v }))}
+                  languageCode={t.languageCode}
+                  rows={2}
+                  placeholder={`Sua frase em ${t.languageName}`}
+                />
+              </div>
+            );
+          })}
+
+          {evaluate.isError && (
+            <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
+              {errorMessage(evaluate.error)}
+            </p>
+          )}
+        </div>
+
+        <LessonFooter
+          detail={
+            written.length === targets.length
+              ? 'As quatro escritas. A correção compara uma com a outra.'
+              : `${written.length} de ${targets.length} escritas. Pode enviar incompleto.`
+          }
+        >
+          <button className="btn-plain" onClick={() => setStep(targets.length - 1)}>
+            Voltar
+          </button>
+          <button
+            className="btn-primary flex-1 px-10 sm:flex-none"
+            onClick={() => evaluate.mutate()}
+            disabled={written.length === 0 || evaluate.isPending}
+          >
+            {evaluate.isPending ? 'Corrigindo...' : 'Corrigir'}
+          </button>
+        </LessonFooter>
+      </>
+    );
+  }
+
+  const theme = languageTheme(target.languageCode);
+  const earlier = targets.slice(0, step).filter((t) => (sentences[t.languageCode] ?? '').trim());
 
   return (
     <>
       <div className="space-y-4">
-        <div className="card space-y-1.5">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-            escreva isto em todos os idiomas
-          </p>
-          <h2 className="text-2xl font-black leading-tight">{mission.data.gloss}</h2>
-          <p className="text-sm font-semibold text-wolf">
-            Uma frase inteira em cada idioma, usando o termo indicado. Sem alternativas: é
-            você contra a memória.
-          </p>
-        </div>
+        {gloss}
+        {trail}
 
-        {mission.data.targets.map((target) => {
-          const theme = languageTheme(target.languageCode);
-          const value = sentences[target.languageCode] ?? '';
-
-          return (
-            <div
-              key={target.languageCode}
-              className={`rounded-2xl border-2 p-3.5 ${theme.border} ${value.trim() ? theme.soft : 'bg-white'}`}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <span aria-hidden className="text-lg">
-                  {theme.flag}
+        {/* O que ele ja escreveu fica a vista: e o apoio comparativo enquanto
+            escreve o proximo idioma, e nao atrapalha o teclado porque e texto. */}
+        {earlier.length > 0 && (
+          <div className="space-y-1.5 rounded-lg bg-snow p-3">
+            {earlier.map((t) => (
+              <p key={t.languageCode} className="text-sm text-wolf">
+                <span className={`mr-1.5 font-mono ${languageTheme(t.languageCode).text}`}>
+                  {languageTheme(t.languageCode).mark}
                 </span>
-                <span className={`text-sm font-black ${theme.text}`}>{target.term}</span>
-                <span className="truncate text-xs font-semibold text-hare">{target.meaning}</span>
-              </div>
-
-              <textarea
-                className="input min-h-[4.5rem] resize-y text-base"
-                value={value}
-                onChange={(e) =>
-                  setSentences((s) => ({ ...s, [target.languageCode]: e.target.value }))
-                }
-                placeholder={`Sua frase em ${target.languageName}`}
-              />
-            </div>
-          );
-        })}
-
-        {evaluate.isError && (
-          <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
-            {errorMessage(evaluate.error)}
-          </p>
+                {sentences[t.languageCode]}
+              </p>
+            ))}
+          </div>
         )}
+
+        <div className={`rounded-lg border p-3.5 ${theme.border}`}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className={`font-mono text-lg ${theme.text}`}>{theme.mark}</span>
+            <span className="text-sm font-medium text-eel">{target.term}</span>
+            <span className="min-w-0 truncate text-xs text-hare">{target.meaning}</span>
+          </div>
+
+          <AnswerTextarea
+            value={sentences[target.languageCode] ?? ''}
+            onChange={(v) => setSentences((s) => ({ ...s, [target.languageCode]: v }))}
+            languageCode={target.languageCode}
+            rows={3}
+            placeholder={`Sua frase em ${target.languageName}`}
+          />
+        </div>
       </div>
 
-      <LessonFooter
-        detail={
-          written.length === mission.data.targets.length
-            ? 'As quatro escritas. A correção compara uma com a outra.'
-            : `${written.length} de ${mission.data.targets.length} escritas. Pode enviar incompleto.`
-        }
-      >
-        <button className="btn-plain" onClick={onSkip}>
-          Pular bloco
-        </button>
-        <button
-          className="btn-primary flex-1 px-10 sm:flex-none"
-          onClick={() => evaluate.mutate()}
-          disabled={written.length === 0 || evaluate.isPending}
-        >
-          {evaluate.isPending ? 'Corrigindo...' : 'Corrigir'}
+      <LessonFooter detail={`${target.languageName}, ${step + 1} de ${targets.length}`}>
+        {step > 0 ? (
+          <button className="btn-plain" onClick={() => setStep((i) => i - 1)}>
+            Voltar
+          </button>
+        ) : (
+          <SkipButton onSkip={onSkip} />
+        )}
+        <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={() => setStep((i) => i + 1)}>
+          {step === targets.length - 1 ? 'Revisar as quatro' : 'Próximo idioma'}
         </button>
       </LessonFooter>
     </>
@@ -178,11 +268,11 @@ function Result({
     <>
       <div className="space-y-4">
         <div className="card flex flex-col items-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{evaluation.score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
-            {acertos} de {evaluation.results.length} frases naturais
+          <p className="font-mono text-3xl text-eel">
+            {acertos}/{evaluation.results.length}
           </p>
-          <p className="text-sm font-semibold text-wolf">{evaluation.gloss}</p>
+          <p className="font-serif text-lg font-semibold text-eel">frases naturais</p>
+          <p className="text-sm text-wolf">{evaluation.gloss}</p>
         </div>
 
         {/* A leitura do conjunto vem antes das correcoes individuais: e o que
@@ -190,9 +280,7 @@ function Result({
         {evaluation.insight && (
           <div className="card border-humpback bg-humpback-soft">
             <p className="section-title mb-1.5">Olhando as quatro juntas</p>
-            <p className="text-sm font-semibold leading-relaxed text-humpback-dark">
-              {evaluation.insight}
-            </p>
+            <p className="text-sm leading-relaxed text-humpback-dark">{evaluation.insight}</p>
           </div>
         )}
 
@@ -205,20 +293,20 @@ function Result({
               className={`card space-y-2.5 ${result.ok ? 'border-grass' : 'border-cardinal'}`}
             >
               <div className="flex items-center gap-2">
-                <span aria-hidden className="text-lg">
-                  {theme.flag}
-                </span>
-                <span className="flex-1 text-sm font-black">{result.languageName}</span>
+                <span className={`font-mono text-lg ${theme.text}`}>{theme.mark}</span>
+                <span className="flex-1 text-sm font-medium text-eel">{result.languageName}</span>
                 <span
-                  className={`chip ${result.ok ? 'bg-grass-soft text-grass-dark' : 'bg-cardinal-soft text-cardinal-dark'}`}
+                  className={`chip ${result.ok ? 'border-grass bg-grass-soft text-grass-dark' : 'border-cardinal bg-cardinal-soft text-cardinal-dark'}`}
                 >
                   {result.ok ? 'natural' : `${result.score}%`}
                 </span>
               </div>
 
               {result.corrected && (
-                <div className="flex items-start gap-2.5 rounded-xl bg-snow p-3">
-                  <p className="min-w-0 flex-1 font-bold leading-snug">{result.corrected}</p>
+                <div className="flex items-start gap-2.5 rounded-md bg-snow p-3">
+                  <p className="min-w-0 flex-1 font-medium leading-snug text-eel">
+                    {result.corrected}
+                  </p>
                   <AudioButton
                     text={result.corrected}
                     languageCode={result.languageCode}
@@ -227,21 +315,17 @@ function Result({
                 </div>
               )}
 
-              {result.feedback && (
-                <p className="text-sm font-semibold text-wolf">{result.feedback}</p>
-              )}
+              {result.feedback && <p className="text-sm text-wolf">{result.feedback}</p>}
 
               {result.errors.map((error, i) => (
                 <div key={`${error.description}-${i}`} className="space-y-0.5">
-                  <p className="text-sm font-black text-cardinal-dark">{error.description}</p>
-                  {error.explanation && (
-                    <p className="text-xs font-semibold text-wolf">{error.explanation}</p>
-                  )}
+                  <p className="text-sm font-medium text-cardinal-dark">{error.description}</p>
+                  {error.explanation && <p className="text-xs text-wolf">{error.explanation}</p>}
                   {/* A origem da interferencia e o dado mais util da correcao:
                       diz ao aluno qual dos outros idiomas dele produziu o erro. */}
                   {error.sourceLanguage && (
-                    <span className="chip bg-bee-soft text-bee-dark">
-                      {languageTheme(error.sourceLanguage).flag} interferência do{' '}
+                    <span className="chip border-bee bg-bee-soft text-bee-dark">
+                      {languageTheme(error.sourceLanguage).mark} interferência do{' '}
                       {LANGUAGE_NAME[error.sourceLanguage] ?? error.sourceLanguage}
                     </span>
                   )}

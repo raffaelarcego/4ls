@@ -1,8 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnswerInput } from '../../components/AnswerField';
+import { AnswerOption } from '../../components/AnswerOption';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { api, errorMessage } from '../../services/api';
 import { SessionActivity } from '../../types';
@@ -91,20 +93,32 @@ function ExerciseRunner({
     onSuccess: (data) => setExercises(data),
   });
 
+  /*
+   * Gera assim que o bloco abre, em vez de esperar um toque em "Gerar
+   * exercicios". O bloco JA e o exercicio -- pedir permissao para comecar o que
+   * ele escolheu comecar era um toque a mais, todo dia, sem decisao nenhuma no
+   * meio. A trava de execucao unica e necessaria porque o StrictMode monta o
+   * componente duas vezes em desenvolvimento, e cada montagem custaria uma
+   * chamada de IA.
+   */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    generate.mutate();
+  }, [generate]);
+
   if (!exercises) {
     return (
       <>
-        <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className={`text-6xl ${generate.isPending ? 'animate-float' : ''}`}>
-            {generate.isError ? '🔌' : '🤖'}
-          </span>
-          <p className="text-lg font-black">
-            {generate.isPending ? 'Escrevendo seus exercícios...' : 'Exercícios sob medida'}
+        <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
+          <p className="font-serif text-lg font-semibold text-eel">
+            {generate.isError ? 'Não deu para gerar os exercícios' : 'Escrevendo seus exercícios...'}
           </p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {generate.isError
               ? errorMessage(generate.error)
-              : 'Eles são gerados a partir dos seus erros recorrentes neste idioma.'}
+              : 'Eles saem dos seus erros recorrentes neste idioma.'}
           </p>
         </div>
 
@@ -119,18 +133,7 @@ function ExerciseRunner({
               </button>
             </>
           ) : (
-            <>
-              <button className="btn-plain" onClick={onSkip}>
-                Pular bloco
-              </button>
-              <button
-                className="btn-primary flex-1 px-10 sm:flex-none"
-                onClick={() => generate.mutate()}
-                disabled={generate.isPending}
-              >
-                {generate.isPending ? 'Gerando...' : 'Gerar exercícios'}
-              </button>
-            </>
+            <SkipButton onSkip={onSkip} />
           )}
         </LessonFooter>
       </>
@@ -144,11 +147,11 @@ function ExerciseRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
-            {correct} de {exercises.length} acertos
+          <p className="font-mono text-3xl text-eel">
+            {correct}/{exercises.length}
           </p>
-          <p className="text-sm font-semibold text-wolf">
+          <p className="font-serif text-lg font-semibold text-eel">acertos</p>
+          <p className="text-sm text-wolf">
             {score >= 70 ? 'Esse ponto está firmando.' : 'Ainda vale insistir aqui.'}
           </p>
         </div>
@@ -175,53 +178,63 @@ function ExerciseRunner({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={exercises.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{exercises.length}
           </span>
         </div>
 
         <div className="flex items-start gap-3">
-          <p className="flex-1 text-xl font-black leading-snug">{exercise.prompt}</p>
+          <p className="min-w-0 flex-1 font-serif text-xl font-semibold leading-snug text-eel">
+            {exercise.prompt}
+          </p>
           <AudioButton text={exercise.prompt} languageCode={activity.languageCode} />
         </div>
 
         {exercise.options?.length > 0 ? (
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {exercise.options.map((option, i) => {
+          <div className="grid gap-2">
+            {exercise.options.map((option) => {
               const selected = answer === option;
               const state = !checked
                 ? selected
-                  ? 'border-macaw bg-macaw-soft text-macaw-dark'
-                  : 'border-swan bg-white hover:bg-snow'
+                  ? 'selected'
+                  : 'idle'
                 : option === exercise.answer
-                  ? 'border-grass bg-grass-soft text-grass-dark'
+                  ? 'correct'
                   : selected
-                    ? 'border-cardinal bg-cardinal-soft text-cardinal-dark'
-                    : 'border-swan bg-white text-hare';
+                    ? 'wrong'
+                    : 'idle';
 
               return (
-                <button
+                <AnswerOption
                   key={option}
-                  onClick={() => !checked && setAnswer(option)}
+                  state={state}
                   disabled={checked}
-                  className={`flex items-center gap-3 rounded-2xl border-2 border-b-[4px] px-4 py-3.5 text-left font-bold transition active:translate-y-[2px] active:border-b-2 ${state}`}
+                  lang={activity.languageCode}
+                  /*
+                   * Escolher JA corrige. Antes eram tres toques por questao --
+                   * opcao no meio da tela, "Verificar" no rodape, "Continuar" no
+                   * mesmo canto --, e dois deles nao decidiam nada.
+                   */
+                  onClick={() => {
+                    if (checked) return;
+                    setAnswer(option);
+                    setChecked(true);
+                  }}
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-current text-xs font-black opacity-60">
-                    {i + 1}
-                  </span>
                   {option}
-                </button>
+                </AnswerOption>
               );
             })}
           </div>
         ) : (
-          <input
-            className="input text-lg"
+          <AnswerInput
             value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
+            onChange={setAnswer}
+            languageCode={activity.languageCode}
             disabled={checked}
             placeholder="Digite sua resposta"
-            autoFocus
+            onSubmit={() => answer && setChecked(true)}
+            className="text-lg"
           />
         )}
       </div>
@@ -229,28 +242,27 @@ function ExerciseRunner({
       {checked ? (
         <LessonFooter
           tone={isCorrect ? 'correct' : 'wrong'}
-          title={isCorrect ? 'Isso mesmo!' : `Resposta certa: ${exercise.answer}`}
+          title={isCorrect ? 'Isso mesmo' : `Resposta certa: ${exercise.answer}`}
           detail={exercise.explanation}
         >
-          <button
-            className={`${isCorrect ? 'btn-primary' : 'btn-danger'} flex-1 px-10 sm:flex-none`}
-            onClick={next}
-          >
+          <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={next}>
             Continuar
           </button>
         </LessonFooter>
       ) : (
         <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
-          <button
-            className="btn-primary flex-1 px-10 sm:flex-none"
-            onClick={() => setChecked(true)}
-            disabled={!answer}
-          >
-            Verificar
-          </button>
+          <SkipButton onSkip={onSkip} />
+          {/* Sem opcoes, a resposta e digitada -- e ai ainda existe um passo de
+              confirmar. Com opcoes, escolher ja corrigiu e o botao nao aparece. */}
+          {!exercise.options?.length && (
+            <button
+              className="btn-primary flex-1 px-10 sm:flex-none"
+              onClick={() => setChecked(true)}
+              disabled={!answer}
+            >
+              Verificar
+            </button>
+          )}
         </LessonFooter>
       )}
     </>

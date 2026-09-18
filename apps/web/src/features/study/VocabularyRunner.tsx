@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+﻿import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { AnswerOption } from '../../components/AnswerOption';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
@@ -47,9 +48,8 @@ export function VocabularyRunner({
   if (lesson.isPending) {
     return (
       <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-        <span className="animate-float text-6xl">💬</span>
-        <p className="text-lg font-black">Separando os conceitos de hoje...</p>
-        <p className="max-w-sm text-sm font-semibold text-wolf">
+        <p className="font-serif text-lg font-semibold text-eel">Separando os conceitos de hoje...</p>
+        <p className="max-w-sm text-sm text-wolf">
           Os mesmos que você vai ver nos outros idiomas.
         </p>
       </div>
@@ -62,18 +62,15 @@ export function VocabularyRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className="text-6xl">🔌</span>
-          <p className="text-lg font-black">Sem conceitos para hoje</p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="font-serif text-lg font-semibold text-eel">Sem conceitos para hoje</p>
+          <p className="max-w-sm text-sm text-wolf">
             {lesson.isError
               ? errorMessage(lesson.error)
               : 'Todos os conceitos disponíveis já estão em revisão. Volte amanhã ou adicione palavras novas.'}
           </p>
         </div>
         <LessonFooter tone="neutral">
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button className="btn-primary px-8" onClick={() => lesson.refetch()}>
             Tentar de novo
           </button>
@@ -101,17 +98,17 @@ export function VocabularyRunner({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={cards.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{cards.length}
           </span>
         </div>
 
         <div className="card space-y-4">
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-              conceito · nível {card.level}
-            </p>
-            <h2 className="text-2xl font-black leading-tight">{card.gloss}</h2>
+            <p className="section-label">conceito · nível {card.level}</p>
+            <h2 className="font-serif text-2xl font-semibold leading-tight text-eel">
+              {card.gloss}
+            </h2>
           </div>
 
           <div className="space-y-2.5">
@@ -122,24 +119,29 @@ export function VocabularyRunner({
               return (
                 <div
                   key={entry.languageCode}
-                  className={`rounded-2xl border-2 px-3.5 py-3 ${
+                  className={`rounded-md border px-3.5 py-3 ${
                     isTarget ? `${theme.border} ${theme.soft}` : 'border-swan bg-white'
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span aria-hidden className="text-xl leading-none">
-                      {theme.flag}
+                    <span aria-hidden className="font-mono text-lg leading-none text-hare">
+                      {theme.mark}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-lg font-black leading-snug ${isTarget ? theme.text : ''}`}>
+                    {/* min-w-0: sem isto o termo longo empurra o botao de audio para fora. */}
+                    <div className="min-w-0 flex-1" lang={entry.languageCode}>
+                      <p
+                        className={`font-serif text-lg font-semibold leading-snug ${
+                          isTarget ? theme.text : 'text-eel'
+                        }`}
+                      >
                         {entry.term}
                       </p>
-                      <p className="text-xs font-semibold text-wolf">{entry.meaning}</p>
-                      {entry.example && (
-                        <p className="mt-1.5 text-sm font-bold leading-snug">{entry.example}</p>
-                      )}
+                      <p className="text-xs text-wolf" lang="pt-BR">
+                        {entry.meaning}
+                      </p>
+                      {entry.example && <p className="mt-1.5 text-sm leading-snug">{entry.example}</p>}
                       {entry.translation && (
-                        <p className="text-xs font-semibold italic text-hare">
+                        <p className="text-xs italic text-hare" lang="pt-BR">
                           {entry.translation}
                         </p>
                       )}
@@ -156,10 +158,7 @@ export function VocabularyRunner({
           </div>
 
           {card.note && (
-            <p className="rounded-xl bg-snow px-3 py-2 text-xs font-semibold text-wolf">
-              <span aria-hidden>🔎 </span>
-              {card.note}
-            </p>
+            <p className="rounded-md bg-snow px-3 py-2 text-xs text-wolf">{card.note}</p>
           )}
         </div>
       </div>
@@ -167,9 +166,7 @@ export function VocabularyRunner({
       <LessonFooter
         detail="Os quatro idiomas entram juntos — é assim que um segura a memória do outro."
       >
-        <button className="btn-plain" onClick={onSkip}>
-          Pular bloco
-        </button>
+        <SkipButton onSkip={onSkip} />
         <button
           className="btn-primary flex-1 px-10 sm:flex-none"
           onClick={() => (isLast ? setPhase('quiz') : setIndex((i) => i + 1))}
@@ -234,11 +231,10 @@ function CrossCheck({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
+          <p className="font-serif text-xl font-semibold text-eel">
             {correct} de {questions.length} acertos
           </p>
-          <p className="text-sm font-semibold text-wolf">
+          <p className="text-sm text-wolf">
             {score >= 70
               ? 'A rede entre os idiomas está firmando.'
               : 'Esses conceitos voltam amanhã, nos quatro idiomas.'}
@@ -269,76 +265,82 @@ function CrossCheck({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={questions.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{questions.length}
           </span>
         </div>
 
         <div className="card space-y-3">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-            {question.gloss}
-          </p>
+          <p className="section-label">{question.gloss}</p>
           <div className="flex items-center gap-3">
-            <span aria-hidden className="text-2xl">
-              {fromTheme.flag}
+            <span aria-hidden className="font-mono text-xl text-hare">
+              {fromTheme.mark}
             </span>
-            <p className={`flex-1 text-2xl font-black ${fromTheme.text}`}>{question.fromTerm}</p>
+            {/* min-w-0: termo alemao ou russo longo empurrava o audio para fora em 360px. */}
+            <p
+              lang={question.fromCode}
+              className={`min-w-0 flex-1 font-serif text-2xl font-semibold ${fromTheme.text}`}
+            >
+              {question.fromTerm}
+            </p>
             <AudioButton text={question.fromTerm} languageCode={question.fromCode} size="sm" />
           </div>
-          <p className="text-sm font-bold text-wolf">
-            <span aria-hidden>{toTheme.flag} </span>
+          <p className="text-sm text-wolf">
+            <span aria-hidden className="font-mono">
+              {toTheme.mark}{' '}
+            </span>
             Como é isso em {languageName(question.toCode)}?
           </p>
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-2">
-          {question.options.map((option, i) => {
-            const selected = answer === option;
-            const state = !checked
-              ? 'border-swan bg-white hover:bg-snow'
-              : option === question.answer
-                ? 'border-grass bg-grass-soft text-grass-dark'
-                : selected
-                  ? 'border-cardinal bg-cardinal-soft text-cardinal-dark'
-                  : 'border-swan bg-white text-hare';
-
-            return (
-              <button
-                key={option}
-                onClick={() => !checked && setAnswer(option)}
-                disabled={checked}
-                className={`flex items-center gap-3 rounded-2xl border-2 border-b-[4px] px-4 py-3.5 text-left font-bold transition active:translate-y-[2px] active:border-b-2 ${state}`}
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-current text-xs font-black opacity-60">
-                  {i + 1}
-                </span>
-                {option}
-              </button>
-            );
-          })}
+          {question.options.map((option) => (
+            <AnswerOption
+              key={option}
+              lang={question.toCode}
+              disabled={checked}
+              state={
+                !checked
+                  ? 'idle'
+                  : option === question.answer
+                    ? 'correct'
+                    : answer === option
+                      ? 'wrong'
+                      : 'idle'
+              }
+              // Tocar na alternativa ja corrige: o "Verificar" no rodape era um
+              // toque que nao decidia nada, longe do dedo e do olhar.
+              onClick={() => !checked && setAnswer(option)}
+            >
+              {option}
+            </AnswerOption>
+          ))}
         </div>
       </div>
 
-      {checked ? (
-        <LessonFooter
-          tone={isCorrect ? 'correct' : 'wrong'}
-          title={isCorrect ? 'Isso mesmo!' : `Resposta certa: ${question.answer}`}
-          detail={`"${question.gloss}" — o mesmo conceito nos quatro idiomas.`}
+      {/*
+        Os dois estados do rodape tem os mesmos dois botoes, na mesma ordem: o
+        "Continuar" ja nasce no lugar (desabilitado) em vez de aparecer depois da
+        resposta e deslocar o que estava sob o polegar.
+      */}
+      <LessonFooter
+        tone={checked ? (isCorrect ? 'correct' : 'wrong') : 'neutral'}
+        title={checked ? (isCorrect ? 'Isso mesmo' : `Resposta certa: ${question.answer}`) : undefined}
+        detail={
+          checked
+            ? `"${question.gloss}" — o mesmo conceito nos quatro idiomas.`
+            : 'Toque na alternativa para responder.'
+        }
+      >
+        <SkipButton onSkip={onSkip} />
+        <button
+          className="btn-primary flex-1 px-10 sm:flex-none"
+          onClick={next}
+          disabled={!checked}
         >
-          <button
-            className={`${isCorrect ? 'btn-primary' : 'btn-danger'} flex-1 px-10 sm:flex-none`}
-            onClick={next}
-          >
-            Continuar
-          </button>
-        </LessonFooter>
-      ) : (
-        <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
-        </LessonFooter>
-      )}
+          Continuar
+        </button>
+      </LessonFooter>
     </>
   );
 }

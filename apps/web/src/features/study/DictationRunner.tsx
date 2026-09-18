@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
-import { LessonFooter } from '../../components/LessonFooter';
+import { useEffect, useState } from 'react';
+import { AnswerInput } from '../../components/AnswerField';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { useSpeaker } from '../../lib/speech';
 import { api, errorMessage } from '../../services/api';
@@ -34,7 +35,6 @@ export function DictationRunner({
   const [checked, setChecked] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [plays, setPlays] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const generate = useMutation({
     mutationFn: async () => {
@@ -52,11 +52,14 @@ export function DictationRunner({
   // Fala a frase automaticamente ao chegar nela: e um ditado, o audio e o
   // enunciado. O primeiro play acontece depois do clique em "Gerar", entao a
   // politica de autoplay do navegador ja foi satisfeita.
+  //
+  // O foco no campo NAO e dado aqui: no celular o teclado subia junto com o
+  // audio e cobria metade da tela antes de ele ter lido qualquer coisa. Ele
+  // toca no campo quando estiver pronto para escrever.
   useEffect(() => {
     if (!sentence) return;
     setPlays(1);
     void speaker.speak(sentence.text, activity.languageCode);
-    inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sentence?.text]);
 
@@ -64,13 +67,10 @@ export function DictationRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className={`text-6xl ${generate.isPending ? 'animate-float' : ''}`}>
-            {generate.isError ? '🔌' : '✏️'}
-          </span>
-          <p className="text-lg font-black">
+          <p className="font-serif text-lg font-semibold text-eel">
             {generate.isPending ? 'Preparando as frases...' : 'Ditado'}
           </p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {generate.isError
               ? errorMessage(generate.error)
               : 'Você ouve a frase e escreve o que ouviu. Escuta e ortografia no mesmo exercício.'}
@@ -78,9 +78,7 @@ export function DictationRunner({
         </div>
 
         <LessonFooter tone={generate.isError ? 'wrong' : 'neutral'}>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => generate.mutate()}
@@ -98,11 +96,10 @@ export function DictationRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
+          <p className="font-serif text-xl font-semibold text-eel">
             {correct} de {sentences.length} frases exatas
           </p>
-          <p className="text-sm font-semibold text-wolf">
+          <p className="text-sm text-wolf">
             {score >= 70 ? 'Ouvido e grafia batendo.' : 'As palavras que escaparam voltam depois.'}
           </p>
         </div>
@@ -135,7 +132,7 @@ export function DictationRunner({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={sentences.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{sentences.length}
           </span>
         </div>
@@ -143,59 +140,77 @@ export function DictationRunner({
         <div className="card flex flex-col items-center gap-3 text-center">
           <button
             onClick={replay}
-            className={`flex h-24 w-24 items-center justify-center rounded-full border-2 border-b-[6px] text-4xl transition active:translate-y-[3px] active:border-b-2 ${
+            className={`btn w-full max-w-xs ${
               speaker.isSpeaking
-                ? 'border-macaw-dark bg-macaw text-white'
-                : 'border-macaw bg-macaw-soft'
+                ? 'border-macaw-dark bg-macaw text-snow'
+                : 'border-macaw bg-macaw-soft text-macaw-dark'
             }`}
-            aria-label="Ouvir a frase de novo"
           >
-            🔊
+            Ouvir a frase de novo
           </button>
-          <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
-            {plays} {plays === 1 ? 'escuta' : 'escutas'} · toque para repetir
+          <p className="font-mono text-xs text-hare">
+            {plays} {plays === 1 ? 'escuta' : 'escutas'}
           </p>
           <p className="chip bg-snow text-wolf">{sentence.focus}</p>
         </div>
 
-        <input
-          ref={inputRef}
-          className="input text-lg"
+        {/*
+          O campo declara o idioma ditado: o corretor em portugues trocava
+          `der` por `de` e a comparacao literal marcava como erro o que ele
+          tinha escrito certo.
+        */}
+        <AnswerInput
           value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !checked && answer.trim()) setChecked(true);
+          onChange={setAnswer}
+          languageCode={activity.languageCode}
+          onSubmit={() => {
+            if (!checked && answer.trim()) setChecked(true);
           }}
           disabled={checked}
           placeholder="Escreva o que você ouviu"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
+          className="text-lg"
         />
 
         {checked && (
           <div className="card space-y-3">
             <div>
               <p className="section-title mb-1.5">Palavra a palavra</p>
-              <p className="flex flex-wrap gap-1.5">
+              {/*
+                O que ele digitou fica VISIVEL embaixo da palavra esperada. Antes
+                vivia num `title`, que no celular nao existe: ele via que errou a
+                palavra e nunca o que tinha escrito -- justamente a informacao que
+                ensina a diferenca.
+              */}
+              <div className="flex flex-wrap gap-1.5">
                 {diff.map((word, i) => (
                   <span
                     key={i}
-                    className={`rounded-lg px-2 py-1 text-sm font-bold ${
+                    className={`rounded-md px-2 py-1 text-sm ${
                       word.ok
                         ? 'bg-grass-soft text-grass-dark'
-                        : 'bg-cardinal-soft text-cardinal-dark line-through decoration-2'
+                        : 'bg-cardinal-soft text-cardinal-dark'
                     }`}
-                    title={word.ok ? undefined : `você escreveu: ${word.typed || '—'}`}
                   >
-                    {word.expected}
+                    <span lang={activity.languageCode} className="font-medium">
+                      {word.expected}
+                    </span>
+                    {!word.ok && (
+                      <span className="mt-0.5 block text-xs line-through">
+                        {word.typed || 'nada'}
+                      </span>
+                    )}
                   </span>
                 ))}
-              </p>
+              </div>
+              {diff.some((word) => !word.ok) && (
+                <p className="section-label mt-1.5">riscado: o que você escreveu</p>
+              )}
             </div>
-            <div className="rounded-xl bg-snow p-3">
-              <p className="text-sm font-bold">{sentence.text}</p>
-              <p className="text-xs font-semibold text-wolf">{sentence.translation}</p>
+            <div className="rounded-md bg-snow p-3">
+              <p lang={activity.languageCode} className="text-sm font-medium">
+                {sentence.text}
+              </p>
+              <p className="text-xs text-wolf">{sentence.translation}</p>
             </div>
           </div>
         )}
@@ -204,7 +219,7 @@ export function DictationRunner({
       {checked ? (
         <LessonFooter
           tone={isPerfect ? 'correct' : 'wrong'}
-          title={isPerfect ? 'Exato!' : 'Quase lá'}
+          title={isPerfect ? 'Exato' : 'Quase lá'}
           detail={
             isPerfect
               ? undefined
@@ -213,18 +228,13 @@ export function DictationRunner({
                 } diferente do áudio.`
           }
         >
-          <button
-            className={`${isPerfect ? 'btn-primary' : 'btn-danger'} flex-1 px-10 sm:flex-none`}
-            onClick={next}
-          >
+          <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={next}>
             Continuar
           </button>
         </LessonFooter>
       ) : (
         <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => setChecked(true)}

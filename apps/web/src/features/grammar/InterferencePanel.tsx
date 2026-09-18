@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+﻿import { useQuery } from '@tanstack/react-query';
 import { languageTheme } from '../../lib/ui';
 import { api } from '../../services/api';
 import { Interference } from '../../types';
@@ -41,7 +41,7 @@ export function InterferencePanel({ onOpenTopic }: { onOpenTopic: (topicId: stri
     <section className="space-y-2.5">
       <div>
         <p className="section-label">Um idioma entrando no outro</p>
-        <p className="text-xs font-semibold text-wolf">
+        <p className="text-xs text-wolf">
           Erros que vieram de importar a regra de outra língua que você estuda.
         </p>
       </div>
@@ -57,20 +57,18 @@ export function InterferencePanel({ onOpenTopic }: { onOpenTopic: (topicId: stri
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="chip bg-bee-soft text-bee-dark">
-                <span aria-hidden>{source.flag}</span> {pair.sourceName}
+                <span aria-hidden>{source.mark}</span> {pair.sourceName}
               </span>
-              <span aria-hidden className="text-sm font-black text-hare">
+              <span aria-hidden className="text-sm text-hare">
                 →
               </span>
               <span className={`chip ${target.soft} ${target.text}`}>
-                <span aria-hidden>{target.flag}</span> {pair.languageName}
+                <span aria-hidden>{target.mark}</span> {pair.languageName}
               </span>
-              <span className="ml-auto text-xs font-extrabold uppercase tracking-wider text-hare">
-                {pair.occurrences}x
-              </span>
+              <span className="ml-auto font-mono text-xs text-hare">{pair.occurrences}x</span>
             </div>
 
-            <p className="text-sm font-semibold text-wolf">
+            <p className="text-sm text-wolf">
               Aparece em {pair.categories.map((c) => CATEGORY_LABEL[c] ?? c.toLowerCase()).join(', ')}.
             </p>
 
@@ -78,17 +76,19 @@ export function InterferencePanel({ onOpenTopic }: { onOpenTopic: (topicId: stri
                 isso resolvem esta interferencia especifica, e nao outra. */}
             {pair.topics.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-                  o que resolve
-                </p>
+                <p className="section-label">O que resolve</p>
                 {pair.topics.map((topic) => (
                   <button
                     key={topic.id}
                     onClick={() => onOpenTopic(topic.id)}
-                    className="w-full rounded-xl border-2 border-swan bg-white px-3 py-2 text-left transition hover:bg-snow active:translate-y-[1px]"
+                    // `tap-target`: este e o atalho mais util do painel e vinha
+                    // com duas linhas curtas de altura, abaixo do minimo de toque.
+                    className="tap-target w-full rounded-md border border-swan bg-white px-3 py-2 text-left transition-colors hover:bg-snow"
                   >
-                    <p className="text-sm font-black leading-snug">{topic.title}</p>
-                    <p className="text-xs font-semibold text-wolf">{topic.question}</p>
+                    <p className="font-serif text-sm font-semibold leading-snug text-eel">
+                      {topic.title}
+                    </p>
+                    <p className="text-xs text-wolf">{topic.question}</p>
                   </button>
                 ))}
               </div>

@@ -21,12 +21,9 @@ export function DashboardPage() {
 
   if (isError || !data) {
     return (
-      <div className="card border-cardinal bg-cardinal-soft text-center">
-        <p className="text-4xl">😵</p>
-        <p className="mt-2 font-extrabold text-cardinal-dark">Não deu para carregar seu dia.</p>
-        <p className="text-sm font-semibold text-wolf">
-          Verifique se a API está no ar e recarregue.
-        </p>
+      <div className="card border-cardinal bg-cardinal-soft">
+        <p className="font-serif font-semibold text-cardinal-dark">Não deu para carregar seu dia.</p>
+        <p className="text-sm text-wolf">Verifique se a API está no ar e recarregue.</p>
       </div>
     );
   }
@@ -39,54 +36,45 @@ export function DashboardPage() {
   return (
     <div className="space-y-7">
       <header>
-        <h1 className="text-2xl font-black tracking-tight">
+        <p className="font-mono text-xs text-hare">{today()}</p>
+        <h1 className="mt-0.5 font-serif text-2xl font-semibold tracking-tight text-eel">
           {greeting()}
-          {streak.current > 0 && (
-            <span className="ml-2 align-middle text-base font-extrabold text-beak">
-              🔥 {streak.current} {streak.current === 1 ? 'dia' : 'dias'} seguidos
-            </span>
-          )}
         </h1>
-        <p className="text-sm font-semibold text-wolf">
-          {session.plannedMinutes} minutos montados a partir do seu desempenho.
+        <p className="text-sm text-wolf">
+          {session.plannedMinutes} minutos montados a partir do seu desempenho
+          {streak.current > 0 &&
+            `, ${streak.current}${streak.current === 1 ? 'º dia seguido' : 'º dia seguido de sequência'}`}
+          .
         </p>
       </header>
 
       {/*
         O "porque" da sessao e um requisito do produto: o usuario precisa
-        entender qual criterio gerou o plano de hoje. Aqui ele vira a fala
-        da coruja, em vez de uma nota de rodape.
+        entender qual criterio gerou o plano de hoje. Uma nota de margem,
+        como quem anota o motivo ao lado do registro.
       */}
       {session.rationale && (
-        <div className="flex items-start gap-3">
-          <span aria-hidden className="animate-float text-4xl leading-none">
-            🦉
-          </span>
-          <div className="relative flex-1 rounded-2xl border-2 border-swan bg-white p-3.5 text-sm font-semibold text-eel">
-            <span className="absolute -left-[9px] top-4 h-4 w-4 rotate-45 border-b-2 border-l-2 border-swan bg-white" />
-            {session.rationale}
-          </div>
-        </div>
+        <p className="border-l-2 border-swan pl-3 font-serif text-sm italic leading-snug text-wolf">
+          {session.rationale}
+        </p>
       )}
 
-      <section className="overflow-hidden rounded-2xl border-2 border-swan">
-        <div className="bg-grass p-5 text-white">
+      <section className="overflow-hidden rounded-lg border border-swan">
+        <div className="bg-grass p-5 text-snow">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-extrabold uppercase tracking-widest text-white/75">
-                Missão de hoje
-              </p>
-              <p className="text-2xl font-black">
-                {total > 0 && done === total ? 'Tudo feito!' : `${total - done} blocos restantes`}
+              <p className="text-xs text-snow/70">Sessão de hoje</p>
+              <p className="font-serif text-xl font-semibold">
+                {total > 0 && done === total ? 'Tudo feito' : `${total - done} blocos restantes`}
               </p>
             </div>
-            <span className="text-4xl font-black tabular-nums text-white/90">
+            <span className="font-mono text-2xl tabular-nums text-snow/90">
               {done}
-              <span className="text-xl text-white/60">/{total}</span>
+              <span className="text-base text-snow/50">/{total}</span>
             </span>
           </div>
-          <div className="mt-3 rounded-full bg-black/15 p-0.5">
-            <ProgressBar value={done} max={total || 1} tone="bg-white" size="lg" />
+          <div className="mt-3">
+            <ProgressBar value={done} max={total || 1} tone="bg-snow" size="lg" trackClassName="bg-black/15" />
           </div>
         </div>
 
@@ -95,6 +83,7 @@ export function DashboardPage() {
             <PathNode
               key={activity.id}
               activity={activity}
+              index={index}
               isNext={index === nextIndex}
               isLast={index === session.activities.length - 1}
               onStart={() => navigate(`/sessao?activity=${activity.id}`)}
@@ -102,14 +91,14 @@ export function DashboardPage() {
           ))}
         </div>
 
-        <div className="border-t-2 border-swan p-4">
+        <div className="border-t border-swan p-4">
           <button
             className="btn-primary w-full py-4 text-base"
             onClick={() => navigate('/sessao')}
             disabled={session.completed}
           >
             {session.completed
-              ? 'Missão concluída'
+              ? 'Sessão concluída'
               : done > 0
                 ? 'Continuar de onde parei'
                 : 'Começar agora'}
@@ -129,14 +118,11 @@ export function DashboardPage() {
       </section>
 
       {!data.aiEnabled && (
-        <div className="card flex items-start gap-3 border-bee bg-bee-soft">
-          <span aria-hidden className="text-2xl">
-            🔌
-          </span>
-          <p className="text-sm font-semibold text-eel">
+        <div className="card border-bee bg-bee-soft">
+          <p className="text-sm text-eel">
             Nenhum provider de IA configurado. O tutor e a geração de exercícios ficam
-            indisponíveis até você preencher <code className="font-black">MIMO_API_KEY</code> ou{' '}
-            <code className="font-black">OPENROUTER_API_KEY</code> no .env do backend. O resto do
+            indisponíveis até você preencher <code className="font-mono">MIMO_API_KEY</code> ou{' '}
+            <code className="font-mono">OPENROUTER_API_KEY</code> no .env do backend. O resto do
             sistema funciona normalmente.
           </p>
         </div>
@@ -145,14 +131,16 @@ export function DashboardPage() {
   );
 }
 
-/** Um passo da trilha: bolinha colorida, o que e, e por que foi recomendado. */
+/** Uma linha de registro: numero da entrada, o que e, e por que foi recomendado. */
 function PathNode({
   activity,
+  index,
   isNext,
   isLast,
   onStart,
 }: {
   activity: SessionActivity;
+  index: number;
   isNext: boolean;
   isLast: boolean;
   onStart: () => void;
@@ -169,45 +157,33 @@ function PathNode({
         ? {}
         : { onClick: onStart, type: 'button' as const, 'aria-label': `Começar ${theme.label}` })}
       className={`relative flex w-full gap-3 pl-1 text-left ${
-        activity.completed ? '' : 'rounded-2xl transition hover:bg-snow'
-      }`}
+        activity.completed ? '' : 'rounded-md transition hover:bg-snow'
+      } ${!isLast ? 'border-b border-swan' : ''}`}
     >
-      {/* Fio que liga um passo ao proximo. */}
-      {!isLast && (
-        <span
-          aria-hidden
-          className={`absolute left-[29px] top-[3.75rem] h-[calc(100%-2.75rem)] w-1 rounded-full ${
-            activity.completed ? 'bg-grass/40' : 'bg-swan'
-          }`}
-        />
-      )}
-
       <span
-        className={`relative z-[1] mt-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-2xl ${
+        className={`mt-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border font-mono text-sm ${
           activity.completed
-            ? 'bg-grass text-white shadow-[0_4px_0_theme(colors.grass-dark)]'
-            : `${language.soft} border-2 ${language.border}`
-        } ${isNext ? 'ring-4 ring-macaw/25' : ''}`}
+            ? 'border-grass bg-grass text-snow'
+            : `${language.soft} ${language.border} ${language.text}`
+        } ${isNext ? 'ring-1 ring-offset-1 ring-macaw' : ''}`}
       >
-        {activity.completed ? '✓' : theme.emoji}
+        {activity.completed ? '✓' : index + 1}
       </span>
 
       <div className="min-w-0 flex-1 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <p
-            className={`truncate font-extrabold ${
-              activity.completed ? 'text-hare line-through' : 'text-eel'
-            }`}
-          >
-            <span aria-hidden>{language.flag} </span>
+          <p className={`truncate font-medium ${activity.completed ? 'text-hare line-through' : 'text-eel'}`}>
+            <span className={`mr-1 font-mono ${language.text}`}>{language.mark}</span>
             {theme.label}
           </p>
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
-            {activity.plannedMinutes} min
-          </span>
+          <span className="shrink-0 font-mono text-xs text-hare">{activity.plannedMinutes} min</span>
         </div>
-        <p className="truncate text-xs font-semibold text-wolf">{activity.reason ?? theme.blurb}</p>
-        {isNext && <span className="chip mt-1.5 bg-macaw-soft text-macaw-dark">Você está aqui</span>}
+        {/* Duas linhas, nao uma. O motivo do bloco e o que responde "por que
+            isto hoje?" -- cortado em "Como este idioma monta a frase. Saber ..."
+            ele deixa de responder e vira ruido. Duas linhas cobrem os motivos
+            que o planejador realmente escreve. */}
+        <p className="line-clamp-2 text-xs leading-snug text-wolf">{activity.reason ?? theme.blurb}</p>
+        {isNext && <span className="chip mt-1.5 border-macaw bg-macaw-soft text-macaw-dark">você está aqui</span>}
       </div>
     </Wrapper>
   );
@@ -223,13 +199,13 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
     <div className="card space-y-3.5">
       <div className="flex items-center gap-3">
         <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 text-2xl ${theme.soft} ${theme.border}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border font-mono text-lg ${theme.soft} ${theme.border} ${theme.text}`}
         >
-          {theme.flag}
+          {theme.mark}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-black">{language.name}</h3>
-          <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
+          <h3 className="truncate font-serif font-semibold text-eel">{language.name}</h3>
+          <p className="font-mono text-xs text-hare">
             {language.currentLevel} → {language.targetLevel}
           </p>
         </div>
@@ -241,11 +217,9 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
           const tone = scoreTone(value);
           return (
             <div key={key} className="flex items-center gap-2">
-              <span className="w-24 shrink-0 truncate text-xs font-extrabold text-wolf">
-                <span aria-hidden>{meta.emoji}</span> {meta.label}
-              </span>
+              <span className="w-24 shrink-0 truncate text-xs text-wolf">{meta.label}</span>
               <ProgressBar value={value} size="sm" tone={tone.bar} />
-              <span className={`w-9 shrink-0 text-right text-xs font-black tabular-nums ${tone.text}`}>
+              <span className={`w-9 shrink-0 text-right font-mono text-xs ${tone.text}`}>
                 {Math.round(value)}
               </span>
             </div>
@@ -253,13 +227,11 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
         })}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t-2 border-swan pt-3">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-hare">
-          {language.vocabulary.total} termos
-        </span>
+      <div className="flex items-center justify-between gap-2 border-t border-swan pt-3">
+        <span className="font-mono text-xs text-hare">{language.vocabulary.total} termos</span>
         <span
           className={`chip ${
-            language.dueReviews > 0 ? 'bg-beak/15 text-beak' : 'bg-grass-soft text-grass-dark'
+            language.dueReviews > 0 ? 'border-beak text-beak' : 'border-grass-soft bg-grass-soft text-grass-dark'
           }`}
         >
           {language.dueReviews > 0 ? `${language.dueReviews} p/ revisar` : 'em dia'}
@@ -267,16 +239,13 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
       </div>
 
       {language.topErrors.length > 0 && (
-        <div className="rounded-xl bg-snow p-3">
-          <p className="section-title mb-1.5">Onde você tropeça</p>
+        <div className="rounded-md bg-snow p-3">
+          <p className="mb-1.5 text-xs text-wolf">Onde você tropeça</p>
           <ul className="space-y-1">
             {language.topErrors.map((error) => (
-              <li
-                key={error.id}
-                className="flex items-baseline justify-between gap-2 text-xs font-semibold text-eel"
-              >
+              <li key={error.id} className="flex items-baseline justify-between gap-2 text-xs text-eel">
                 <span className="truncate">{error.description}</span>
-                <span className="shrink-0 font-black text-cardinal">{error.occurrenceCount}x</span>
+                <span className="shrink-0 font-mono text-cardinal">{error.occurrenceCount}×</span>
               </li>
             ))}
           </ul>
@@ -301,8 +270,12 @@ function LoadingState() {
 
 function greeting(): string {
   const hour = new Date().getHours();
-  if (hour < 6) return 'Ainda acordado? 🌙';
-  if (hour < 12) return 'Bom dia! ☀️';
-  if (hour < 18) return 'Boa tarde! 👋';
-  return 'Boa noite! 🌆';
+  if (hour < 6) return 'Ainda acordado?';
+  if (hour < 12) return 'Bom dia.';
+  if (hour < 18) return 'Boa tarde.';
+  return 'Boa noite.';
+}
+
+function today(): string {
+  return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 }

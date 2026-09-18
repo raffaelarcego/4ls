@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activityTheme, languageTheme } from '../../lib/ui';
@@ -66,9 +66,7 @@ export function PracticePicker({ languages }: { languages: DashboardLanguage[] }
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="section-title">Prática livre</h2>
-          <p className="text-xs font-semibold text-wolf">
-            Entra na sessão de hoje e vale XP igual aos blocos planejados.
-          </p>
+          <p className="text-xs text-wolf">Entra na sessão de hoje e vale XP igual aos blocos planejados.</p>
         </div>
         <button className="btn-plain px-2 text-xs" onClick={() => setOpen(false)}>
           Fechar
@@ -83,14 +81,14 @@ export function PracticePicker({ languages }: { languages: DashboardLanguage[] }
             <button
               key={language.code}
               onClick={() => setLanguageCode(language.code)}
-              className={`flex-1 rounded-2xl border-2 border-b-[4px] px-2 py-2.5 text-xs font-extrabold uppercase tracking-wide transition active:translate-y-[2px] active:border-b-2 ${
+              className={`flex-1 rounded-md border px-2 py-2.5 font-mono text-xs transition ${
                 isActive
                   ? `${theme.border} ${theme.soft} ${theme.text}`
                   : 'border-swan bg-white text-wolf hover:bg-snow'
               }`}
             >
               <span aria-hidden className="mr-1">
-                {theme.flag}
+                {theme.mark}
               </span>
               {language.code.toUpperCase()}
             </button>
@@ -106,27 +104,22 @@ export function PracticePicker({ languages }: { languages: DashboardLanguage[] }
             <button
               key={option}
               onClick={() => setType(option)}
-              className={`flex flex-col items-center gap-1 rounded-2xl border-2 border-b-[4px] px-1 py-3 text-[10px] font-extrabold uppercase tracking-wide transition active:translate-y-[2px] active:border-b-2 ${
+              className={`flex flex-col items-center gap-1 rounded-md border px-1 py-3 text-[11px] transition ${
                 isActive
                   ? 'border-macaw bg-macaw-soft text-macaw-dark'
                   : 'border-swan bg-white text-wolf hover:bg-snow'
               }`}
             >
-              <span aria-hidden className="text-2xl">
-                {theme.emoji}
-              </span>
               {theme.label}
             </button>
           );
         })}
       </div>
 
-      <p className="rounded-xl bg-snow px-3 py-2 text-xs font-semibold text-wolf">
-        {activityTheme(type).blurb}
-      </p>
+      <p className="rounded-md bg-snow px-3 py-2 text-xs text-wolf">{activityTheme(type).blurb}</p>
 
       {start.isError && (
-        <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
+        <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
           {errorMessage(start.error)}
         </p>
       )}

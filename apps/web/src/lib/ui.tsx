@@ -5,54 +5,62 @@
  */
 
 export interface LanguageTheme {
-  flag: string;
+  /** Monograma tipografico do idioma -- uma letra que so existe nele. */
+  mark: string;
   /** Cor solida de fundo (avatar, barra de progresso). */
   bg: string;
-  /** Sombra 3D correspondente. */
-  shadow: string;
   text: string;
   soft: string;
   border: string;
 }
 
 const FALLBACK_LANGUAGE: LanguageTheme = {
-  flag: '🌍',
+  mark: '?',
   bg: 'bg-humpback',
-  shadow: 'shadow-[0_4px_0_theme(colors.humpback-dark)]',
   text: 'text-humpback-dark',
   soft: 'bg-humpback-soft',
   border: 'border-humpback',
 };
 
 const LANGUAGE_THEMES: Record<string, LanguageTheme> = {
+  /*
+   * Portugues nao e um idioma estudado -- e a referencia, e aparece o tempo
+   * todo como origem de comparacao e de interferencia. Por isso esta aqui em
+   * tom neutro, e nao com uma cor propria: visualmente ele nao disputa com os
+   * quatro que estao sendo aprendidos. Sem esta entrada, `languageTheme('pt')`
+   * caia no fallback e o portugues aparecia como "?".
+   */
+  pt: {
+    mark: 'ã',
+    bg: 'bg-wolf',
+    text: 'text-wolf',
+    soft: 'bg-snow',
+    border: 'border-swan',
+  },
   en: {
-    flag: '🇬🇧',
+    mark: 'w',
     bg: 'bg-macaw',
-    shadow: 'shadow-[0_4px_0_theme(colors.macaw-dark)]',
     text: 'text-macaw-dark',
     soft: 'bg-macaw-soft',
     border: 'border-macaw',
   },
   es: {
-    flag: '🇪🇸',
+    mark: 'ñ',
     bg: 'bg-bee',
-    shadow: 'shadow-[0_4px_0_theme(colors.bee-dark)]',
     text: 'text-bee-dark',
     soft: 'bg-bee-soft',
     border: 'border-bee',
   },
   de: {
-    flag: '🇩🇪',
-    bg: 'bg-cardinal',
-    shadow: 'shadow-[0_4px_0_theme(colors.cardinal-dark)]',
-    text: 'text-cardinal-dark',
-    soft: 'bg-cardinal-soft',
-    border: 'border-cardinal',
+    mark: 'ß',
+    bg: 'bg-forest',
+    text: 'text-forest-dark',
+    soft: 'bg-forest-soft',
+    border: 'border-forest',
   },
   ru: {
-    flag: '🇷🇺',
+    mark: 'ы',
     bg: 'bg-humpback',
-    shadow: 'shadow-[0_4px_0_theme(colors.humpback-dark)]',
     text: 'text-humpback-dark',
     soft: 'bg-humpback-soft',
     border: 'border-humpback',

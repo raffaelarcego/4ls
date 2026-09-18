@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
@@ -56,9 +56,7 @@ export function TextCapture() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="section-title">Aprender de um texto</h2>
-          <p className="text-xs font-semibold text-wolf">
-            Cole algo que você leu. O vocabulário entra nos quatro idiomas.
-          </p>
+          <p className="text-xs text-wolf">Cole algo que você leu. O vocabulário entra nos quatro idiomas.</p>
         </div>
         <button
           className="btn-plain px-2 text-xs"
@@ -79,14 +77,14 @@ export function TextCapture() {
             <button
               key={option.code}
               onClick={() => setLanguageCode(option.code)}
-              className={`flex-1 rounded-2xl border-2 border-b-[4px] px-2 py-2.5 text-xs font-extrabold uppercase tracking-wide transition active:translate-y-[2px] active:border-b-2 ${
+              className={`flex-1 rounded-md border px-2 py-2.5 font-mono text-xs transition ${
                 active
                   ? `${theme.border} ${theme.soft} ${theme.text}`
                   : 'border-swan bg-white text-wolf hover:bg-snow'
               }`}
             >
               <span aria-hidden className="mr-1">
-                {theme.flag}
+                {theme.mark}
               </span>
               {option.code.toUpperCase()}
             </button>
@@ -102,7 +100,7 @@ export function TextCapture() {
       />
 
       {capture.isError && (
-        <p className="rounded-xl bg-cardinal-soft px-3 py-2 text-sm font-bold text-cardinal-dark">
+        <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
           {errorMessage(capture.error)}
         </p>
       )}
@@ -110,7 +108,7 @@ export function TextCapture() {
       {result && (
         <div className="space-y-2.5">
           {result.learned.length === 0 ? (
-            <p className="rounded-xl bg-snow px-3 py-2 text-sm font-semibold text-wolf">
+            <p className="rounded-md bg-snow px-3 py-2 text-sm text-wolf">
               Nada de novo neste texto para o seu nível — você já sabe o que vale a pena aqui.
             </p>
           ) : (
@@ -119,15 +117,12 @@ export function TextCapture() {
                 {result.learned.length} conceito(s) novo(s), em todos os idiomas
               </p>
               {result.learned.map((card) => (
-                <div key={card.id} className="rounded-2xl border-2 border-swan bg-white p-3">
-                  <p className="text-sm font-black">{card.gloss}</p>
+                <div key={card.id} className="rounded-md border border-swan bg-white p-3">
+                  <p className="text-sm font-medium text-eel">{card.gloss}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {card.entries.map((entry) => (
-                      <span
-                        key={entry.languageCode}
-                        className="chip bg-snow text-xs font-bold text-eel"
-                      >
-                        {languageTheme(entry.languageCode).flag} {entry.term}
+                      <span key={entry.languageCode} className="chip">
+                        {languageTheme(entry.languageCode).mark} {entry.term}
                       </span>
                     ))}
                   </div>
@@ -139,9 +134,7 @@ export function TextCapture() {
           {/* Dizer o que foi descartado importa: sem isso, "3 de 6 termos"
               parece falha da extracao em vez do que e -- voce ja sabia o resto. */}
           {result.skipped.length > 0 && (
-            <p className="text-xs font-semibold text-hare">
-              Já no seu vocabulário: {result.skipped.join(', ')}
-            </p>
+            <p className="text-xs text-hare">Já no seu vocabulário: {result.skipped.join(', ')}</p>
           )}
         </div>
       )}

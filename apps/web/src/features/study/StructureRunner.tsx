@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { api, errorMessage } from '../../services/api';
 import { SessionActivity, StructureLesson } from '../../types';
@@ -47,9 +47,8 @@ export function StructureRunner({
   if (lesson.isPending) {
     return (
       <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-        <span className="animate-float text-6xl">🧱</span>
-        <p className="text-lg font-black">Montando a aula de estrutura...</p>
-        <p className="max-w-sm text-sm font-semibold text-wolf">
+        <p className="font-serif text-lg font-semibold text-eel">Montando a aula de estrutura...</p>
+        <p className="max-w-sm text-sm text-wolf">
           Como o {activity.languageName} monta a frase, e onde o português te trai.
         </p>
       </div>
@@ -60,14 +59,11 @@ export function StructureRunner({
     return (
       <>
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className="text-6xl">🔌</span>
-          <p className="text-lg font-black">Não consegui montar a aula</p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">{errorMessage(lesson.error)}</p>
+          <p className="font-serif text-lg font-semibold text-eel">Não consegui montar a aula</p>
+          <p className="max-w-sm text-sm text-wolf">{errorMessage(lesson.error)}</p>
         </div>
         <LessonFooter tone="wrong">
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button className="btn-primary px-8" onClick={() => lesson.refetch()}>
             Tentar de novo
           </button>
@@ -97,20 +93,20 @@ function Explanation({
       <div className="space-y-4">
         <div className="card space-y-3">
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-              formação de frase · {lesson.languageName} · nível {lesson.level}
+            <p className="font-mono text-xs text-hare">
+              formação de frase, {lesson.languageName}, nível {lesson.level}
             </p>
-            <h2 className="text-xl font-black leading-tight">{lesson.title}</h2>
-            <p className="text-sm font-semibold italic text-wolf">{lesson.question}</p>
+            <h2 className="font-serif text-xl font-semibold leading-tight text-eel">{lesson.title}</h2>
+            <p className="font-serif text-sm italic text-wolf">{lesson.question}</p>
           </div>
 
-          <p className="rounded-2xl border-2 border-macaw bg-macaw-soft px-4 py-3 text-base font-black text-macaw-dark">
+          <p className="rounded-md border border-macaw bg-macaw-soft px-4 py-3 font-mono text-base text-macaw-dark">
             {lesson.formula}
           </p>
 
-          <p className="text-sm font-semibold leading-relaxed text-eel">{lesson.behavior}</p>
+          <p className="text-sm leading-relaxed text-eel">{lesson.behavior}</p>
           {lesson.explanation !== lesson.behavior && (
-            <p className="text-sm font-semibold leading-relaxed text-wolf">{lesson.explanation}</p>
+            <p className="text-sm leading-relaxed text-wolf">{lesson.explanation}</p>
           )}
         </div>
 
@@ -119,8 +115,8 @@ function Explanation({
             <p className="section-title">Como montar</p>
             <ol className="space-y-2">
               {lesson.steps.map((step, i) => (
-                <li key={step} className="flex gap-3 text-sm font-bold leading-snug">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-macaw text-xs font-black text-white">
+                <li key={step} className="flex gap-3 text-sm leading-snug text-eel">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-macaw font-mono text-xs text-macaw">
                     {i + 1}
                   </span>
                   {step}
@@ -136,8 +132,10 @@ function Explanation({
             <div key={example.sentence} className="card space-y-2.5">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-black leading-snug">{example.sentence}</p>
-                  <p className="text-xs font-semibold italic text-hare">{example.translation}</p>
+                  <p className="font-serif text-lg font-semibold leading-snug text-eel">
+                    {example.sentence}
+                  </p>
+                  <p className="text-xs italic text-hare">{example.translation}</p>
                 </div>
                 <AudioButton
                   text={example.sentence}
@@ -150,21 +148,18 @@ function Explanation({
                 {example.parts.map((part, i) => (
                   <span
                     key={`${part.text}-${i}`}
-                    className="rounded-xl border-2 border-swan bg-snow px-2.5 py-1.5"
+                    className="rounded-md border border-swan bg-snow px-2.5 py-1.5"
                   >
-                    <span className="block text-sm font-black leading-tight">{part.text}</span>
-                    <span className="block text-[10px] font-extrabold uppercase tracking-wide text-hare">
-                      {part.role}
+                    <span className="block text-sm font-medium leading-tight text-eel">
+                      {part.text}
                     </span>
+                    <span className="block text-[11px] leading-tight text-hare">{part.role}</span>
                   </span>
                 ))}
               </div>
 
               {example.note && (
-                <p className="text-xs font-semibold text-wolf">
-                  <span aria-hidden>🔎 </span>
-                  {example.note}
-                </p>
+                <p className="text-xs text-wolf">{example.note}</p>
               )}
             </div>
           ))}
@@ -175,9 +170,7 @@ function Explanation({
             do idioma vizinho. */}
         <div className="card border-humpback bg-humpback-soft">
           <p className="section-title mb-1.5">Nos outros idiomas</p>
-          <p className="text-sm font-semibold leading-relaxed text-humpback-dark">
-            {lesson.contrast}
-          </p>
+          <p className="text-sm leading-relaxed text-humpback-dark">{lesson.contrast}</p>
         </div>
 
         {lesson.pitfalls.length > 0 && (
@@ -185,11 +178,9 @@ function Explanation({
             <p className="section-title">Onde o português te trai</p>
             {lesson.pitfalls.map((pitfall) => (
               <div key={pitfall.wrong} className="space-y-1">
-                <p className="text-sm font-black text-cardinal-dark line-through">
-                  {pitfall.wrong}
-                </p>
-                <p className="text-sm font-black text-grass-dark">{pitfall.right}</p>
-                <p className="text-xs font-semibold text-wolf">{pitfall.why}</p>
+                <p className="text-sm text-cardinal-dark line-through">{pitfall.wrong}</p>
+                <p className="text-sm font-medium text-grass-dark">{pitfall.right}</p>
+                <p className="text-xs text-wolf">{pitfall.why}</p>
               </div>
             ))}
           </div>
@@ -197,9 +188,7 @@ function Explanation({
       </div>
 
       <LessonFooter detail="Agora monte as frases você mesmo.">
-        <button className="btn-plain" onClick={onSkip}>
-          Pular bloco
-        </button>
+        <SkipButton onSkip={onSkip} />
         <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={onContinue}>
           Praticar
         </button>
@@ -314,30 +303,30 @@ function AssemblyDrills({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={lesson.drills.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{lesson.drills.length}
           </span>
         </div>
 
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-hare">
-            monte a frase
-          </p>
-          <p className="text-xl font-black leading-snug">{drill.gloss}</p>
+          <p className="text-xs text-hare">Monte a frase</p>
+          <p className="font-serif text-xl font-semibold leading-snug text-eel">{drill.gloss}</p>
         </div>
 
         {/* Linha de montagem: o que ja foi escolhido, na ordem. */}
-        <div className="min-h-[4.5rem] rounded-2xl border-2 border-dashed border-swan bg-snow p-3">
+        <div className="min-h-[5.5rem] rounded-lg border border-dashed border-swan bg-snow p-2.5">
           {picked.length === 0 ? (
-            <p className="text-sm font-semibold text-hare">Toque nas peças na ordem certa.</p>
+            <p className="p-1 text-sm text-hare">Toque nas peças na ordem certa.</p>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {picked.map((pieceIndex, position) => (
                 <button
                   key={`${pieceIndex}-${position}`}
                   disabled={checked}
                   onClick={() => setPicked((p) => p.filter((_, i) => i !== position))}
-                  className="rounded-xl border-2 border-b-[4px] border-macaw bg-white px-3 py-2 text-sm font-black transition active:translate-y-[2px] active:border-b-2"
+                  lang={lesson.languageCode}
+                  aria-label={`Remover ${drill.scrambled[pieceIndex]}`}
+                  className="min-h-11 rounded-md border border-macaw bg-white px-3 py-2 text-base text-macaw-dark transition-colors"
                 >
                   {drill.scrambled[pieceIndex]}
                 </button>
@@ -346,8 +335,12 @@ function AssemblyDrills({
           )}
         </div>
 
-        {/* Banco de pecas: some da lista o que ja foi para a linha. */}
-        <div className="flex flex-wrap gap-1.5">
+        {/*
+          Banco de pecas. A peca ja usada continua no lugar, apagada: tirar da
+          lista reflui as outras e a frase que ele estava montando mentalmente
+          muda de posicao no meio da montagem.
+        */}
+        <div className="flex flex-wrap gap-2">
           {drill.scrambled.map((piece, pieceIndex) => {
             const used = picked.includes(pieceIndex);
             return (
@@ -355,10 +348,9 @@ function AssemblyDrills({
                 key={`${piece}-${pieceIndex}`}
                 disabled={used || checked}
                 onClick={() => setPicked((p) => [...p, pieceIndex])}
-                className={`rounded-xl border-2 border-b-[4px] px-3 py-2 text-sm font-black transition active:translate-y-[2px] active:border-b-2 ${
-                  used
-                    ? 'border-swan bg-snow text-transparent'
-                    : 'border-swan bg-white hover:bg-snow'
+                lang={lesson.languageCode}
+                className={`min-h-11 rounded-md border px-3 py-2 text-base transition-colors ${
+                  used ? 'border-dashed border-swan bg-snow text-hare/40' : 'border-swan bg-white text-eel'
                 }`}
               >
                 {piece}
@@ -371,21 +363,22 @@ function AssemblyDrills({
       {checked ? (
         <LessonFooter
           tone={isCorrect ? 'correct' : 'wrong'}
-          title={isCorrect ? 'Isso mesmo!' : `Ordem certa: ${drill.answer}`}
+          title={isCorrect ? 'Isso mesmo' : `Ordem certa: ${drill.answer}`}
           detail={drill.explanation}
         >
-          <button
-            className={`${isCorrect ? 'btn-primary' : 'btn-danger'} flex-1 px-10 sm:flex-none`}
-            onClick={next}
-          >
+          <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={next}>
             Continuar
           </button>
         </LessonFooter>
       ) : (
         <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          {picked.length > 0 ? (
+            <button className="btn-plain" onClick={() => setPicked([])}>
+              Limpar
+            </button>
+          ) : (
+            <SkipButton onSkip={onSkip} />
+          )}
           <button
             className="btn-primary flex-1 px-10 sm:flex-none"
             onClick={() => setChecked(true)}

@@ -1,5 +1,7 @@
-import { useMutation } from '@tanstack/react-query';
+﻿import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { AnswerInput } from '../../components/AnswerField';
+import { AnswerOption, OptionState } from '../../components/AnswerOption';
 import { AudioButton } from '../../components/AudioButton';
 import { LessonFooter } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
@@ -93,15 +95,12 @@ export function DrillRunner({
   // ----- carregar -----
   if (!drills) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-5">
+      <div className="lesson-pad">
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-3 text-center">
-          <span className={`text-6xl ${generate.isPending ? 'animate-float' : ''}`}>
-            {generate.isError ? '🔌' : '🧩'}
-          </span>
-          <p className="text-lg font-black">
+          <p className="font-serif text-lg font-semibold text-eel">
             {generate.isPending ? 'Montando os exercícios...' : title}
           </p>
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {generate.isError
               ? errorMessage(generate.error)
               : 'Frases paralelas e armadilhas de interferência, feitas em cima deste contraste.'}
@@ -144,18 +143,18 @@ export function DrillRunner({
     const score = Math.round((correct / drills.length) * 100);
 
     return (
-      <div className="mx-auto max-w-3xl px-4 py-5">
+      <div className="lesson-pad">
         <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-          <span className="animate-pop text-6xl">{score >= 70 ? '🎉' : '💪'}</span>
-          <p className="text-xl font-black">
-            {correct} de {drills.length} acertos
+          <p className="font-mono text-xl text-eel">
+            {correct}/{drills.length}
           </p>
+          <p className="font-serif text-base font-semibold text-eel">acertos nesta rodada</p>
           {result && (
-            <p className="text-sm font-semibold text-wolf">
-              Domínio deste ponto: <strong>{result.mastery}%</strong>
+            <p className="text-sm text-wolf">
+              Domínio deste ponto: <span className="font-mono">{result.mastery}%</span>
             </p>
           )}
-          <p className="max-w-sm text-sm font-semibold text-wolf">
+          <p className="max-w-sm text-sm text-wolf">
             {score >= 70
               ? 'O contraste está firmando. Volte daqui a alguns dias para confirmar.'
               : 'Vale reler a comparação lado a lado antes de treinar de novo.'}
@@ -182,45 +181,53 @@ export function DrillRunner({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 pb-32">
+    /*
+     * `lesson-pad` no lugar do `pb-32` chutado: o rodape fixo cresce quando a
+     * resposta certa e uma frase inteira, e o chute deixava a propria correcao
+     * escondida atras dele. A classe reserva a altura medida do rodape mais a
+     * das abas.
+     */
+    <div className="lesson-pad space-y-4">
       <div className="flex items-center gap-3">
         <ProgressBar value={index} max={drills.length} size="sm" tone="bg-macaw" />
-        <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+        <span className="shrink-0 font-mono text-xs text-hare">
           {index + 1}/{drills.length}
         </span>
       </div>
 
       <div className="flex items-center gap-2">
         <span className={`chip ${meta.chip}`}>{meta.label}</span>
-        <span className="text-xs font-bold text-hare">{meta.hint}</span>
+        <span className="min-w-0 text-xs text-hare">{meta.hint}</span>
       </div>
 
       {drill.gloss && drill.type !== 'align' && (
-        <p className="text-sm font-extrabold uppercase tracking-wider text-hare">{drill.gloss}</p>
+        <p className="text-sm text-hare">{drill.gloss}</p>
       )}
 
       {/* As versoes de apoio ficam ANTES da pergunta: e delas que o aluno deve
           deduzir a resposta, entao elas precisam ser lidas primeiro. */}
       {drill.shown.length > 0 && (
-        <div className="space-y-1.5 rounded-2xl border-2 border-swan bg-snow p-3">
-          {drill.shown.map((line, i) => {
-            const theme = languageTheme(line.lang);
-            return (
-              <div key={`${line.lang}-${i}`} className="flex items-center gap-2.5">
-                <span className="w-6 shrink-0 text-center">
-                  {line.lang === 'pt' ? '🇧🇷' : theme.flag}
-                </span>
-                <span className="flex-1 font-bold">{line.text}</span>
-                {line.lang !== 'pt' && <AudioButton text={line.text} languageCode={line.lang} />}
-              </div>
-            );
-          })}
+        <div className="space-y-1.5 rounded-lg border border-swan bg-snow p-3">
+          {drill.shown.map((line, i) => (
+            <div key={`${line.lang}-${i}`} className="flex items-center gap-2.5">
+              <span aria-hidden className="w-6 shrink-0 text-center font-serif">
+                {line.lang === 'pt' ? 'ã' : languageTheme(line.lang).mark}
+              </span>
+              {/* `min-w-0`: o texto precisa poder quebrar, senao um composto
+                  alemao empurra o botao de audio para fora da tela. */}
+              <span lang={line.lang} className="min-w-0 flex-1 font-medium">
+                {line.text}
+              </span>
+              {line.lang !== 'pt' && <AudioButton text={line.text} languageCode={line.lang} />}
+            </div>
+          ))}
         </div>
       )}
 
       <p
-        className={`text-xl font-black leading-snug ${
-          drill.type === 'trap' && !checked ? 'text-cardinal-dark' : ''
+        lang={languageCode}
+        className={`font-serif text-xl font-semibold leading-snug ${
+          drill.type === 'trap' && !checked ? 'text-cardinal-dark' : 'text-eel'
         }`}
       >
         {drill.sentence}
@@ -230,34 +237,39 @@ export function DrillRunner({
         <div className="grid gap-2.5 sm:grid-cols-2">
           {drill.options.map((option) => {
             const selected = answer === option;
-            const state = !checked
+            const state: OptionState = !checked
               ? selected
-                ? 'border-macaw bg-macaw-soft text-macaw-dark'
-                : 'border-swan bg-white hover:bg-snow'
+                ? 'selected'
+                : 'idle'
               : option === drill.answer
-                ? 'border-grass bg-grass-soft text-grass-dark'
+                ? 'correct'
                 : selected
-                  ? 'border-cardinal bg-cardinal-soft text-cardinal-dark'
-                  : 'border-swan bg-white text-hare';
+                  ? 'wrong'
+                  : 'idle';
 
             return (
-              <button
+              <AnswerOption
                 key={option}
-                onClick={() => !checked && setAnswer(option)}
+                lang={languageCode}
+                state={state}
                 disabled={checked}
-                className={`rounded-2xl border-2 border-b-[4px] px-4 py-3.5 text-left font-bold capitalize transition active:translate-y-[2px] active:border-b-2 ${state}`}
+                onClick={() => setAnswer(option)}
               >
                 {option}
-              </button>
+              </AnswerOption>
             );
           })}
         </div>
       ) : (
-        <input
-          className="input text-lg"
+        /* `AnswerInput` e obrigatorio aqui: o teclado em portugues corrigia
+           `der` para `de` e a comparacao literal marcava de errado uma resposta
+           certa. */
+        <AnswerInput
           value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
+          onChange={setAnswer}
+          languageCode={languageCode}
           disabled={checked}
+          onSubmit={() => answer.trim() && setChecked(true)}
           placeholder={
             drill.type === 'trap'
               ? 'Escreva a frase corrigida'
@@ -265,7 +277,6 @@ export function DrillRunner({
                 ? 'Complete as duas lacunas, na ordem'
                 : 'Complete a lacuna'
           }
-          autoFocus
         />
       )}
 

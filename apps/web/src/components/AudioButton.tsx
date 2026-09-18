@@ -24,8 +24,13 @@ export function AudioButton({
 
   if (!speaker.available) return null;
 
+  /*
+    O tamanho `sm` era 32px -- abaixo do minimo tocavel, e justamente no botao
+    que aparece ao lado de cada termo, cada exemplo e cada fala do tutor. Agora
+    o menor ainda e 44px; o que encolhe e o icone dentro dele, nao o alvo.
+  */
   const box =
-    size === 'lg' ? 'h-14 w-14 text-2xl' : size === 'sm' ? 'h-8 w-8 text-sm' : 'h-11 w-11 text-lg';
+    size === 'lg' ? 'h-14 w-14 text-2xl' : size === 'sm' ? 'h-11 w-11 text-sm' : 'h-11 w-11 text-lg';
 
   return (
     <button
@@ -33,11 +38,11 @@ export function AudioButton({
       onClick={() => (isThis ? speaker.stop() : void speaker.speak(text, languageCode))}
       aria-label={label ?? `Ouvir: ${text}`}
       title={speaker.naturalVoice ? 'Ouvir' : 'Ouvir (voz do navegador)'}
-      className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-b-[4px] font-extrabold uppercase tracking-wide transition active:translate-y-[2px] active:border-b-2 ${
+      className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors ${
         isThis
-          ? 'border-macaw-dark bg-macaw text-white'
-          : 'border-macaw bg-macaw-soft text-macaw-dark hover:brightness-95'
-      } ${label ? 'px-4 py-3 text-sm' : box} ${className}`}
+          ? 'border-macaw-dark bg-macaw text-snow'
+          : 'border-macaw bg-macaw-soft text-macaw-dark'
+      } ${label ? 'px-4 py-3' : box} ${className}`}
     >
       <SpeakerIcon animated={isThis} />
       {label}

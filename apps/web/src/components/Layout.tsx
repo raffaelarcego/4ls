@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useHeightVar } from '../lib/metrics';
 import { useBottomBanner } from '../lib/pwa';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
@@ -9,11 +10,11 @@ import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from
 import { InstallButton, InstallPrompt } from './InstallPrompt';
 
 const NAV = [
-  { to: '/', label: 'Aprender', Icon: HomeIcon, tone: 'text-macaw' },
-  { to: '/vocabulario', label: 'Palavras', Icon: CardsIcon, tone: 'text-grass' },
-  { to: '/estruturas', label: 'Estruturas', Icon: PuzzleIcon, tone: 'text-cardinal' },
-  { to: '/tutor', label: 'Tutor', Icon: ChatIcon, tone: 'text-humpback' },
-  { to: '/progresso', label: 'Progresso', Icon: ChartIcon, tone: 'text-beak' },
+  { to: '/', label: 'Aprender', Icon: HomeIcon },
+  { to: '/vocabulario', label: 'Palavras', Icon: CardsIcon },
+  { to: '/estruturas', label: 'Estruturas', Icon: PuzzleIcon },
+  { to: '/tutor', label: 'Tutor', Icon: ChatIcon },
+  { to: '/progresso', label: 'Progresso', Icon: ChartIcon },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -34,6 +35,20 @@ export function Layout({ children }: { children: ReactNode }) {
    * existe evita o espaco vazio permanente que um padding fixo deixaria.
    */
   const banner = useBottomBanner();
+
+  // As abas publicam a propria altura para que o rodape das licoes se posicione
+  // acima delas em vez de ficar por baixo. Some sozinho no desktop, onde a
+  // barra esta escondida por breakpoint e mede zero.
+  const tabbarRef = useHeightVar<HTMLElement>('--tabbar-h');
+
+  // Com as abas na tela, sao elas que absorvem a area segura de baixo; somar o
+  // mesmo espaco tambem no rodape da licao abriria uma faixa vazia no iPhone.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--footer-safe', '0px');
+    return () => {
+      document.documentElement.style.removeProperty('--footer-safe');
+    };
+  }, []);
   // No desktop a barra fica rente ao rodape (sem abas embaixo), entao ela ocupa
   // bem menos altura -- por isso a reserva e menor la.
   // Agora que a barra cabe em uma linha, a reserva encolheu junto: abas (~58px)
@@ -41,42 +56,37 @@ export function Layout({ children }: { children: ReactNode }) {
   const bottomSpace = banner ? 'pb-40 lg:pb-24' : 'pb-24 lg:pb-12';
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-snow">
       {/* Barra lateral (desktop) */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r-2 border-swan bg-white px-3 py-5 lg:flex">
-        <span className="mb-6 px-3 text-2xl font-black tracking-tight text-grass">
-          4L<span className="text-macaw">.</span>
-        </span>
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-swan bg-snow px-3 py-5 lg:flex">
+        <span className="mb-1 px-3 font-serif text-2xl font-semibold tracking-tight text-eel">4L</span>
+        <span className="mb-6 px-3 font-mono text-[11px] text-hare">diário de bordo</span>
 
-        <nav className="flex flex-1 flex-col gap-1.5">
-          {NAV.map(({ to, label, Icon, tone }) => (
+        <nav className="flex flex-1 flex-col gap-0.5">
+          {NAV.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-2xl border-2 px-3 py-2.5 text-sm font-extrabold uppercase tracking-wide transition ${
+                `flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition ${
                   isActive
-                    ? 'border-macaw bg-macaw-soft text-macaw-dark'
-                    : 'border-transparent text-wolf hover:bg-snow'
+                    ? 'border-grass font-medium text-eel'
+                    : 'border-transparent text-wolf hover:border-swan hover:text-eel'
                 }`
               }
             >
-              {({ isActive }) => (
-                <>
-                  <Icon className={`h-6 w-6 ${isActive ? '' : tone}`} />
-                  {label}
-                </>
-              )}
+              <Icon className="h-5 w-5" />
+              {label}
             </NavLink>
           ))}
         </nav>
 
-        <div className="mt-4 border-t-2 border-swan pt-3">
-          <p className="truncate px-3 text-sm font-extrabold text-eel">{user?.name}</p>
+        <div className="mt-4 border-t border-swan pt-3">
+          <p className="truncate px-3 text-sm font-medium text-eel">{user?.name}</p>
           <button
             onClick={signOut}
-            className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold uppercase tracking-wider text-hare transition hover:bg-snow hover:text-cardinal"
+            className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-hare transition hover:bg-swan/40 hover:text-cardinal"
           >
             <LogoutIcon className="h-4 w-4" />
             Sair
@@ -86,21 +96,21 @@ export function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="lg:pl-60">
-        {/* Placar: ofensiva e XP, sempre a vista */}
-        <header className="sticky top-0 z-10 border-b-2 border-swan bg-white/90 backdrop-blur">
+        {/* Registro do dia: sequencia e minutos, sempre a vista */}
+        <header className="sticky top-0 z-10 border-b border-swan bg-snow/90 backdrop-blur">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2.5">
-            <span className="text-xl font-black tracking-tight text-grass lg:hidden">
-              4L<span className="text-macaw">.</span>
-            </span>
+            <span className="font-serif text-xl font-semibold tracking-tight text-eel lg:hidden">4L</span>
             {/* Caminho permanente para instalar. Some sozinho quando o app ja
                 esta instalado -- ate la, e o unico ponto que nao depende de o
                 navegador decidir oferecer. No desktop ele vive na barra
                 lateral, entao aqui some para nao aparecer duas vezes. */}
             <InstallButton className="lg:hidden" />
-            <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
-              <Score emoji="🔥" value={data ? `${data.streak.current}` : '—'} label="ofensiva" tone="text-beak" />
-              <Score emoji="⚡" value={data ? `${data.xp.today}` : '—'} label="xp hoje" tone="text-bee-dark" />
-              <Score emoji="💎" value={data ? `${data.xp.total}` : '—'} label="xp total" tone="text-macaw" />
+            <div className="flex flex-1 items-center justify-end gap-4 sm:gap-5">
+              <Score value={data ? `${data.streak.current}` : '—'} label="dias seguidos" />
+              <span className="h-6 w-px bg-swan" aria-hidden />
+              <Score value={data ? `${data.xp.today}` : '—'} label="min. hoje" />
+              <span className="hidden h-6 w-px bg-swan sm:block" aria-hidden />
+              <Score value={data ? `${data.xp.total}` : '—'} label="min. no total" className="hidden sm:flex" />
             </div>
           </div>
         </header>
@@ -120,31 +130,27 @@ export function Layout({ children }: { children: ReactNode }) {
         pb-[env(safe-area-inset-bottom)] mantem as abas acima da barra de gestos
         do iPhone, ja que o viewport e viewport-fit=cover.
       */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid auto-cols-fr grid-flow-col border-t-2 border-swan bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
-        {NAV.map(({ to, label, Icon, tone }) => (
+      <nav
+        ref={tabbarRef}
+        className="fixed inset-x-0 bottom-0 z-20 grid auto-cols-fr grid-flow-col border-t border-swan bg-snow pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
+        {NAV.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex min-w-0 flex-col items-center gap-0.5 py-2 text-[10px] font-extrabold uppercase tracking-wide transition ${
-                isActive ? `${tone}` : 'text-hare'
+              `flex min-w-0 flex-col items-center gap-1 border-t-2 py-2 text-[10px] leading-tight transition ${
+                isActive ? 'border-grass text-eel' : 'border-transparent text-hare'
               }`
             }
           >
-            {({ isActive }) => (
-              <>
-                <span className={`rounded-xl px-3 py-0.5 transition ${isActive ? 'bg-snow' : ''}`}>
-                  <Icon className="h-6 w-6" />
-                </span>
-                {/* `truncate` e a garantia, nao o acabamento: "Estruturas" e
-                    "Progresso" em caixa alta ocupam quase os 72px de uma celula
-                    num aparelho de 360px, e bastava uma fonte um pouco mais
-                    larga para o rotulo pular para a segunda linha e desalinhar
-                    a barra inteira. */}
-                <span className="w-full truncate px-0.5 text-center">{label}</span>
-              </>
-            )}
+            <Icon className="h-5 w-5" />
+            {/* `truncate` e a garantia, nao o acabamento: "Estruturas" e
+                "Progresso" ocupam quase os 72px de uma celula num aparelho de
+                360px, e bastava uma fonte um pouco mais larga para o rotulo
+                pular para a segunda linha e desalinhar a barra inteira. */}
+            <span className="w-full truncate px-0.5 text-center">{label}</span>
           </NavLink>
         ))}
       </nav>
@@ -155,23 +161,18 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 function Score({
-  emoji,
   value,
   label,
-  tone,
+  className = '',
 }: {
-  emoji: string;
   value: string;
   label: string;
-  tone: string;
+  className?: string;
 }) {
   return (
-    <span className="flex items-center gap-1.5" title={label}>
-      <span aria-hidden className="text-lg leading-none">
-        {emoji}
-      </span>
-      <span className={`text-base font-black leading-none ${tone}`}>{value}</span>
-      <span className="sr-only">{label}</span>
+    <span className={`flex flex-col items-end leading-none ${className}`} title={label}>
+      <span className="font-mono text-base font-medium text-eel">{value}</span>
+      <span className="mt-0.5 text-[10px] text-hare">{label}</span>
     </span>
   );
 }

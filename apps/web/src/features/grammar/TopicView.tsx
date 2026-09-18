@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { UIEvent, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AudioButton } from '../../components/AudioButton';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
@@ -31,7 +32,21 @@ export function TopicView({
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [training, setTraining] = useState(false);
+
+  /*
+   * O treino e mais um nivel de navegacao, entao mora na URL junto com o
+   * topico: entrar empilha uma entrada e sair e `navigate(-1)`. Com useState o
+   * gesto de voltar do celular pulava do drill direto para fora do modulo.
+   */
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const training = params.get('treino') === '1';
+
+  const [column, setColumn] = useState(0);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [training]);
 
   const { data, isLoading } = useQuery<TopicDetail>({
     queryKey: ['grammar', 'topic', topicId, languageCode],
@@ -49,9 +64,9 @@ export function TopicView({
 
   if (isLoading || !data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-5">
+      <div>
         <div className="card flex min-h-[16rem] items-center justify-center">
-          <span className="animate-float text-5xl">🧩</span>
+          <p className="text-sm text-wolf">Carregando a comparação...</p>
         </div>
       </div>
     );
@@ -64,49 +79,76 @@ export function TopicView({
         languageCode={languageCode}
         title={data.title}
         onDone={() => {
-          setTraining(false);
           queryClient.invalidateQueries({ queryKey: ['grammar'] });
+          navigate(-1);
         }}
       />
     );
   }
 
+  // O indicador de colunas so e util enquanto o carrossel existe -- no desktop
+  // as colunas cabem lado a lado e o indice nao significa nada.
+  function handleColumnScroll(event: UIEvent<HTMLDivElement>) {
+    const strip = event.currentTarget;
+    const card = strip.firstElementChild as HTMLElement | null;
+    if (!card) return;
+    const step = card.offsetWidth + 10;
+    setColumn(Math.round(strip.scrollLeft / step));
+  }
+
   return (
-    <div className="mx-auto max-w-3xl space-y-5 px-4 py-5">
-      <button onClick={onBack} className="btn-plain -ml-3 text-sm">
+    // A margem lateral vem do <main> do Layout; repetir aqui estreitava o
+    // carrossel de comparacao justamente onde ele precisa de largura.
+    <div className="space-y-5">
+      <button onClick={onBack} className="btn-plain tap-target -ml-3 text-sm">
         ← Voltar
       </button>
 
       <header className="space-y-1.5">
-        <h1 className="text-2xl font-black leading-tight tracking-tight">{data.title}</h1>
-        <p className="font-semibold text-wolf">{data.question}</p>
+        <h1 className="font-serif text-2xl font-semibold leading-tight text-eel">{data.title}</h1>
+        <p className="text-wolf">{data.question}</p>
       </header>
 
-      {/* Tabela de comparacao: uma coluna por idioma, alvo primeiro. Rola na
-          horizontal no celular em vez de espremer o texto. */}
-      <section className="-mx-4 overflow-x-auto px-4">
-        <div className="flex min-w-max gap-2.5 pb-1">
-          {data.columns.map((column) => {
-            const theme = languageTheme(column.lang);
-            const label = roleLabel(column);
+      {/*
+        Tabela de comparacao: uma coluna por idioma, alvo primeiro.
+
+        No celular ela e um carrossel, nao uma tabela. Antes eram cards de 240px
+        numa faixa de ~1250px vista por uma janela de 360px, dentro de um
+        scroller vertical e sem nenhum sinal de que havia mais coisa a direita --
+        na pratica o aluno lia so a primeira coluna. Agora o card mede pela
+        viewport (o proximo aparece pela borda, entao da para adivinhar o gesto),
+        o snap encaixa uma coluna por vez e o contador diz quantas existem.
+      */}
+      <section className="space-y-2">
+        <div
+          onScroll={handleColumnScroll}
+          className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1"
+        >
+          {data.columns.map((col) => {
+            const label = roleLabel(col);
             return (
               <div
-                key={column.lang}
-                className={`w-60 shrink-0 space-y-2 rounded-2xl border-2 p-3.5 ${columnStyle(column)}`}
+                key={col.lang}
+                className={`w-[85vw] max-w-xs shrink-0 snap-start space-y-2 rounded-lg border p-3.5 ${columnStyle(col)}`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{column.lang === 'pt' ? '🇧🇷' : theme.flag}</span>
-                  <span className="text-sm font-black capitalize">{column.name}</span>
+                  <span aria-hidden className="font-serif text-lg">
+                    {languageTheme(col.lang).mark}
+                  </span>
+                  <span className="font-serif text-sm font-semibold capitalize">{col.name}</span>
                 </div>
-                {label && (
-                  <p className="text-[0.65rem] font-extrabold uppercase tracking-wider opacity-70">
-                    {label}
-                  </p>
-                )}
-                <p className="text-sm font-semibold leading-snug">{column.behavior}</p>
+                {label && <p className="text-xs text-wolf">{label}</p>}
+                <p className="text-sm leading-snug">{col.behavior}</p>
               </div>
             );
           })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-hare">
+            {Math.min(column + 1, data.columns.length)}/{data.columns.length}
+          </span>
+          <span className="text-xs text-hare">idiomas — deslize para comparar</span>
         </div>
       </section>
 
@@ -116,25 +158,25 @@ export function TopicView({
         <p className="section-label">A mesma frase, lado a lado</p>
         {data.examples.map((example, index) => (
           <div key={index} className="card space-y-2.5">
-            <p className="text-xs font-extrabold uppercase tracking-wider text-hare">
-              {example.gloss}
-            </p>
+            <p className="text-xs text-hare">{example.gloss}</p>
             <div className="space-y-1.5">
               {example.cells.map((cell) => {
-                const column = data.columns.find((c) => c.lang === cell.lang);
-                const theme = languageTheme(cell.lang);
+                const col = data.columns.find((c) => c.lang === cell.lang);
                 return (
                   <div
                     key={cell.lang}
-                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 ${
-                      column?.isTarget ? 'bg-macaw-soft' : ''
+                    className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
+                      col?.isTarget ? 'bg-macaw-soft' : ''
                     }`}
                   >
-                    <span className="w-6 shrink-0 text-center">
-                      {cell.lang === 'pt' ? '🇧🇷' : theme.flag}
+                    <span aria-hidden className="w-6 shrink-0 text-center font-serif">
+                      {languageTheme(cell.lang).mark}
                     </span>
+                    {/* `min-w-0`: sem ele um composto alemao longo nao quebra e
+                        empurra o botao de audio para fora da tela em 360px. */}
                     <span
-                      className={`flex-1 font-bold ${column?.isTarget ? 'text-macaw-dark' : ''}`}
+                      lang={cell.lang}
+                      className={`min-w-0 flex-1 font-medium ${col?.isTarget ? 'text-macaw-dark' : ''}`}
                     >
                       {cell.text}
                     </span>
@@ -146,38 +188,41 @@ export function TopicView({
               })}
             </div>
             {example.note && (
-              <p className="rounded-xl bg-snow px-3 py-2 text-sm font-semibold text-wolf">
-                {example.note}
-              </p>
+              <p className="rounded-md bg-snow px-3 py-2 text-sm text-wolf">{example.note}</p>
             )}
           </div>
         ))}
       </section>
 
       {data.bridge && (
-        <section className="rounded-2xl border-2 border-humpback bg-humpback-soft p-4">
-          <p className="mb-1 text-xs font-extrabold uppercase tracking-wider text-humpback-dark">
-            🌉 O que você já sabe que ajuda aqui
+        <section className="rounded-lg border border-humpback bg-humpback-soft p-4">
+          <p className="mb-1 font-serif text-sm font-semibold text-humpback-dark">
+            O que você já sabe que ajuda aqui
           </p>
-          <p className="text-sm font-semibold leading-snug text-humpback-dark">{data.bridge}</p>
+          <p className="text-sm leading-snug text-humpback-dark">{data.bridge}</p>
         </section>
       )}
 
       {data.trap && (
-        <section className="rounded-2xl border-2 border-cardinal bg-cardinal-soft p-4">
-          <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-cardinal-dark">
-            ⚠️ O erro que essa confusão produz
+        <section className="rounded-lg border border-cardinal bg-cardinal-soft p-4">
+          <p className="mb-2 font-serif text-sm font-semibold text-cardinal-dark">
+            O erro que essa confusão produz
           </p>
-          <p className="font-bold text-cardinal-dark line-through decoration-2">
+          <p lang={languageCode} className="text-cardinal-dark line-through">
             {data.trap.wrong}
           </p>
-          <p className="font-black text-grass-dark">{data.trap.right}</p>
-          <p className="mt-2 text-sm font-semibold text-cardinal-dark/90">{data.trap.why}</p>
+          <p lang={languageCode} className="font-semibold text-grass-dark">
+            {data.trap.right}
+          </p>
+          <p className="mt-2 text-sm text-cardinal-dark/90">{data.trap.why}</p>
         </section>
       )}
 
       <div className="flex flex-col gap-2.5 sm:flex-row">
-        <button className="btn-primary flex-1" onClick={() => setTraining(true)}>
+        <button
+          className="btn-primary flex-1"
+          onClick={() => setParams({ topico: topicId, treino: '1' })}
+        >
           Treinar este ponto
         </button>
         <button
@@ -185,13 +230,11 @@ export function TopicView({
           onClick={() => flag.mutate(!data.flagged)}
           disabled={flag.isPending}
         >
-          {data.flagged ? '★ Marcado como confuso' : '☆ Ainda me confunde'}
+          {data.flagged ? 'Marcado como confuso' : 'Ainda me confunde'}
         </button>
       </div>
 
-      {flag.isError && (
-        <p className="text-sm font-bold text-cardinal-dark">{errorMessage(flag.error)}</p>
-      )}
+      {flag.isError && <p className="text-sm text-cardinal-dark">{errorMessage(flag.error)}</p>}
     </div>
   );
 }

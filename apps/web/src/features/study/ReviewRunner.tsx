@@ -1,37 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AudioButton } from '../../components/AudioButton';
-import { LessonFooter } from '../../components/LessonFooter';
+import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { languageTheme } from '../../lib/ui';
 import { api } from '../../services/api';
 import { ReviewGrade, ReviewItem } from '../../types';
 
-const GRADES: Array<{ grade: ReviewGrade; emoji: string; label: string; className: string }> = [
-  {
-    grade: 'again',
-    emoji: '😵',
-    label: 'Errei',
-    className: 'bg-cardinal text-white shadow-[0_4px_0_theme(colors.cardinal-dark)]',
-  },
-  {
-    grade: 'hard',
-    emoji: '😅',
-    label: 'Difícil',
-    className: 'bg-beak text-white shadow-[0_4px_0_#D97E00]',
-  },
-  {
-    grade: 'good',
-    emoji: '🙂',
-    label: 'Acertei',
-    className: 'bg-grass text-white shadow-[0_4px_0_theme(colors.grass-dark)]',
-  },
-  {
-    grade: 'easy',
-    emoji: '😎',
-    label: 'Fácil',
-    className: 'bg-macaw text-white shadow-[0_4px_0_theme(colors.macaw-dark)]',
-  },
+const GRADES: Array<{ grade: ReviewGrade; label: string; className: string }> = [
+  { grade: 'again', label: 'Errei', className: 'border-cardinal bg-cardinal text-snow' },
+  { grade: 'hard', label: 'Difícil', className: 'border-bee bg-bee text-snow' },
+  { grade: 'good', label: 'Acertei', className: 'border-grass bg-grass text-snow' },
+  { grade: 'easy', label: 'Fácil', className: 'border-macaw bg-macaw text-snow' },
 ];
 
 /** Flashcards com repeticao espacada, para atividades do tipo "review". */
@@ -72,13 +52,13 @@ export function ReviewRunner({
   });
 
   if (isLoading) {
-    return <div className="h-56 animate-pulse rounded-2xl bg-snow" />;
+    return <div className="h-56 animate-pulse rounded-lg bg-snow" />;
   }
 
   if (!items || items.length === 0) {
     return (
       <>
-        <EmptyOrDone emoji="✨" title="Revisão em dia" text="Nenhum card venceu neste idioma." />
+        <EmptyOrDone title="Revisão em dia" text="Nenhum card venceu neste idioma." />
         <LessonFooter tone="correct" title="Nada para revisar" detail="Você está em dia por aqui.">
           <button className="btn-primary px-8" onClick={() => onFinish(100)}>
             Continuar
@@ -96,11 +76,10 @@ export function ReviewRunner({
     return (
       <>
         <EmptyOrDone
-          emoji={score >= 70 ? '🎉' : '💪'}
           title={`${correct} de ${items.length} acertos`}
           text={
             score >= 70
-              ? 'Boa! Os que você errou voltam mais cedo.'
+              ? 'Os que você errou voltam mais cedo.'
               : 'Os difíceis voltam logo — é assim que fixam.'
           }
         />
@@ -126,29 +105,34 @@ export function ReviewRunner({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={items.length} size="sm" tone="bg-macaw" />
-          <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider text-hare">
+          <span className="shrink-0 font-mono text-xs text-hare">
             {index + 1}/{items.length}
           </span>
         </div>
 
         <div
           key={item.id}
-          className="animate-pop card flex min-h-[16rem] flex-col items-center justify-center gap-4 text-center"
+          className="card flex min-h-[16rem] flex-col items-center justify-center gap-4 text-center"
         >
-          <div className="flex items-center gap-3">
-            <p className="text-3xl font-black">{item.term}</p>
+          <div className="flex w-full items-center justify-center gap-3">
+            {/* min-w-0: composto alemao ou termo russo longo empurrava a tela em 360px. */}
+            <p lang={languageCode} className="min-w-0 font-serif text-3xl font-semibold text-eel">
+              {item.term}
+            </p>
             <AudioButton text={item.term} languageCode={languageCode} />
           </div>
 
           {revealed ? (
             <div className="w-full space-y-3">
-              <p className="text-xl font-extrabold text-macaw-dark">{item.meaning}</p>
+              <p className="text-xl font-medium text-macaw-dark">{item.meaning}</p>
               {item.example && (
-                <div className="flex items-start gap-2.5 rounded-2xl bg-snow p-3.5 text-left">
+                <div className="flex items-start gap-2.5 rounded-md bg-snow p-3.5 text-left">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold italic text-eel">{item.example}</p>
+                    <p lang={languageCode} className="italic text-eel">
+                      {item.example}
+                    </p>
                     {item.translation && (
-                      <p className="mt-1 text-sm font-semibold text-wolf">{item.translation}</p>
+                      <p className="mt-1 text-sm text-wolf">{item.translation}</p>
                     )}
                   </div>
                   <AudioButton text={item.example} languageCode={languageCode} size="sm" />
@@ -157,9 +141,7 @@ export function ReviewRunner({
             </div>
           ) : (
             <div className="w-full space-y-3">
-              <p className="text-sm font-semibold text-hare">
-                Tente lembrar o significado antes de revelar.
-              </p>
+              <p className="text-sm text-wolf">Tente lembrar o significado antes de revelar.</p>
 
               {/*
                 O andaime: a mesma coisa num idioma que o aluno ja domina.
@@ -172,22 +154,28 @@ export function ReviewRunner({
               {item.scaffold &&
                 (hinted ? (
                   <div
-                    className={`mx-auto flex max-w-xs items-center justify-center gap-2.5 rounded-2xl border-2 px-3.5 py-2.5 ${
+                    className={`mx-auto flex max-w-xs items-center justify-center gap-2.5 rounded-md border px-3.5 py-2.5 ${
                       languageTheme(item.scaffold.languageCode).border
                     } ${languageTheme(item.scaffold.languageCode).soft}`}
                   >
-                    <span aria-hidden className="text-xl">
-                      {languageTheme(item.scaffold.languageCode).flag}
+                    <span aria-hidden className="font-mono text-lg">
+                      {languageTheme(item.scaffold.languageCode).mark}
                     </span>
-                    <div className="text-left">
-                      <p className="text-base font-black leading-tight">{item.scaffold.term}</p>
-                      <p className="text-[10px] font-extrabold uppercase tracking-wide text-hare">
-                        você já sabe esta
+                    <div className="min-w-0 text-left">
+                      <p
+                        lang={item.scaffold.languageCode}
+                        className="font-serif text-base font-semibold leading-tight"
+                      >
+                        {item.scaffold.term}
                       </p>
+                      <p className="section-label">você já sabe esta</p>
                     </div>
                   </div>
                 ) : (
-                  <button className="btn-plain text-xs" onClick={() => setHinted(true)}>
+                  <button
+                    className="btn-ghost tap-target mx-auto w-full max-w-xs"
+                    onClick={() => setHinted(true)}
+                  >
                     Dica: como é em outro idioma
                   </button>
                 ))}
@@ -212,16 +200,18 @@ export function ReviewRunner({
               : 'Isso define quando o card volta.'
           }
         >
-          <div className="grid w-full grid-cols-4 gap-2 sm:w-auto">
+          {/*
+            2x2 no celular: quatro botoes lado a lado em 360px sobravam ~80px
+            cada, e "Difícil"/"Acertei" so cabiam encolhendo a fonte abaixo do
+            legivel. Em 2x2 cada alvo fica com largura de sobra e 44px de altura.
+          */}
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
             {GRADES.map((option) => (
               <button
                 key={option.grade}
                 onClick={() => handleGrade(option.grade)}
-                className={`btn flex-col gap-0.5 px-2 py-2.5 text-[11px] active:translate-y-[4px] active:shadow-none sm:px-4 ${option.className}`}
+                className={`btn tap-target px-3 py-2.5 text-sm ${option.className}`}
               >
-                <span aria-hidden className="text-lg leading-none">
-                  {option.emoji}
-                </span>
                 {option.label}
               </button>
             ))}
@@ -229,9 +219,7 @@ export function ReviewRunner({
         </LessonFooter>
       ) : (
         <LessonFooter>
-          <button className="btn-plain" onClick={onSkip}>
-            Pular bloco
-          </button>
+          <SkipButton onSkip={onSkip} />
           <button className="btn-primary flex-1 px-10 sm:flex-none" onClick={() => setRevealed(true)}>
             Revelar
           </button>
@@ -241,12 +229,11 @@ export function ReviewRunner({
   );
 }
 
-function EmptyOrDone({ emoji, title, text }: { emoji: string; title: string; text: string }) {
+function EmptyOrDone({ title, text }: { title: string; text: string }) {
   return (
     <div className="card flex min-h-[16rem] flex-col items-center justify-center gap-2 text-center">
-      <span className="animate-pop text-6xl">{emoji}</span>
-      <p className="text-xl font-black">{title}</p>
-      <p className="text-sm font-semibold text-wolf">{text}</p>
+      <p className="font-serif text-xl font-semibold text-eel">{title}</p>
+      <p className="text-sm text-wolf">{text}</p>
     </div>
   );
 }
