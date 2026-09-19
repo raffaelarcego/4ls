@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Hero } from './components/Hero';
 import { Layout } from './components/Layout';
 import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { LoginPage } from './features/auth/LoginPage';
@@ -40,8 +41,11 @@ export function App() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3">
-        <span className="animate-float text-6xl">🦉</span>
-        <p className="font-extrabold text-wolf">Abrindo sua sessão...</p>
+        {/* A coruja aqui era resto de uma fase anterior do visual -- nao
+            pertencia nem ao diario sobrio nem a expedicao. Quem espera agora e
+            o proprio personagem, correndo. */}
+        <Hero mood="focus" size="lg" accent="text-macaw" />
+        <p className="font-bold text-wolf">Abrindo sua sessão...</p>
       </div>
     );
   }

@@ -194,18 +194,19 @@
   }
 
   /*
-    Quem prefere menos movimento nao recebe nenhum. O personagem inteiro e
-    animacao, entao isto nao e detalhe de acessibilidade -- e a diferenca
-    entre o app ser usavel ou nao para quem tem sensibilidade a movimento.
+    Quem prefere menos movimento nao recebe nenhum.
+
+    O personagem tem a propria trava, em JavaScript: ele para num quadro so em
+    vez de perder a animacao e sumir. Aqui ficam os movimentos puramente
+    decorativos -- halo, brilho, flutuacao --, que nao carregam informacao
+    nenhuma e por isso podem simplesmente parar.
   */
   @media (prefers-reduced-motion: reduce) {
-    .animate-breathe,
-    .animate-blink,
-    .animate-cheer,
     .animate-float,
     .animate-halo,
     .animate-sheen,
-    .animate-wiggle {
+    .animate-wiggle,
+    .animate-pop {
       animation: none !important;
     }
   }

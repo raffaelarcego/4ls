@@ -101,32 +101,8 @@ export default {
           '50%': { transform: 'translateY(-6px)' },
         },
 
-        /* --- Personagem --- */
+        /* --- Recompensa --- */
 
-        // Respiracao parada: o corpo sobe e desce de leve.
-        breathe: {
-          '0%, 100%': { transform: 'translateY(0) scaleY(1)' },
-          '50%': { transform: 'translateY(-2px) scaleY(1.02)' },
-        },
-        // Piscada: a palpebra fecha por um instante e volta. O atraso longo
-        // entre repeticoes e o que faz parecer vivo em vez de nervoso.
-        blink: {
-          '0%, 92%, 100%': { transform: 'scaleY(1)' },
-          '96%': { transform: 'scaleY(0.05)' },
-        },
-        // Comemoracao: dois pulos, o segundo menor.
-        cheer: {
-          '0%': { transform: 'translateY(0)' },
-          '20%': { transform: 'translateY(-16px)' },
-          '40%': { transform: 'translateY(0)' },
-          '55%': { transform: 'translateY(-7px)' },
-          '70%, 100%': { transform: 'translateY(0)' },
-        },
-        // Desanimo: afunda e fica.
-        slump: {
-          from: { transform: 'translateY(0)' },
-          to: { transform: 'translateY(4px)' },
-        },
         // Brilho pulsante para o no ativo da trilha.
         halo: {
           '0%, 100%': { opacity: '0.35', transform: 'scale(1)' },
@@ -143,10 +119,6 @@ export default {
         'slide-up': 'slide-up 220ms ease-out',
         wiggle: 'wiggle 500ms ease-in-out 2',
         float: 'float 3s ease-in-out infinite',
-        breathe: 'breathe 3.4s ease-in-out infinite',
-        blink: 'blink 5.2s ease-in-out infinite',
-        cheer: 'cheer 900ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-        slump: 'slump 400ms ease-out forwards',
         halo: 'halo 2.4s ease-in-out infinite',
         sheen: 'sheen 2.6s ease-in-out infinite',
       },

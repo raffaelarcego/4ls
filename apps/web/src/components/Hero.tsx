@@ -1,30 +1,95 @@
+import { useEffect, useRef, useState } from 'react';
+
 /**
- * O personagem.
+ * O personagem, animado a partir de uma SPRITE SHEET.
  *
- * Desenhado em SVG e animado por CSS, e nao montado a partir de sprites
- * gerados. A razao e pratica: sprite sheet exige consistencia exata entre
- * quadros, fundo transparente e alinhamento de pixel, e modelo de imagem erra
- * os tres -- cada quadro volta com um personagem levemente diferente, e a
- * animacao "treme". Aqui cada membro e um grupo com nome, entao a pose e
- * controlada, escala sem perder nitidez em qualquer tela, pesa poucos KB e nao
- * depende de nenhuma chamada de rede para aparecer.
+ * A primeira versao desenhava o boneco em SVG a mao. Estava ruim, e a razao e
+ * estrutural, nao de capricho: um personagem de jogo depende de peso, timing e
+ * deformacao entre quadros -- o corpo se estica no pulo, o pe achata no chao --
+ * e nada disso sai de formas geometricas interpoladas por CSS. Quadro desenhado
+ * por ilustrador resolve em cinco poses o que o SVG nao alcanca com vinte
+ * keyframes.
  *
- * Ele existe para uma coisa so: dar a quem abre o app alguem esperando do outro
- * lado. Por isso ele REAGE -- comemora quando o bloco fecha bem, murcha quando
- * a sequencia cai -- em vez de ser um enfeite parado no topo da tela.
+ * COMO OS QUADROS ANDAM
  *
- * A cor vem de fora (`accent`), e e sempre a do contexto: a do idioma do bloco,
- * a do nivel, a do erro. Assim ele pertence a tela em que esta, em vez de
- * carregar uma paleta propria que brigaria com o resto.
+ * O passo de quadro e feito em JavaScript, e nao com `steps()` do CSS. Parece
+ * mais trabalho e e menos: `steps()` so sabe repetir em laco, e metade das
+ * poses aqui NAO repete -- cair e machucar tocam uma vez e SEGURAM o ultimo
+ * quadro. Em CSS isso vira `animation-fill-mode` mais `animationend` mais um
+ * keyframe por contagem de quadros; aqui e um indice e um `setInterval`.
+ *
+ * Sao no maximo dois personagens na tela ao mesmo tempo (rodape da licao e
+ * cabecalho), entao o custo de um timer por instancia nao aparece em lugar
+ * nenhum.
  */
+
+/* ------------------------------------------------------------------ *
+ * CONFIGURACAO DA FOLHA
+ *
+ * Estes numeros sao a unica coisa que muda quando a arte muda. Estao no topo,
+ * juntos e sozinhos, exatamente por isso.
+ *
+ * ATENCAO -- os valores abaixo sao uma LEITURA da folha, nao uma medicao: a
+ * imagem foi descrita, nao medida. Se o personagem aparecer cortado ou
+ * "pulando" entre poses, o erro esta aqui e em mais lugar nenhum: confira
+ * `FRAME` contra a largura real do PNG dividida pelo numero de colunas.
+ * ------------------------------------------------------------------ */
+
+/** Onde o arquivo vive, servido a partir de `apps/web/public/`. */
+const SHEET_URL = '/hero-sprite.png';
+
+/** A folha inteira, em celulas. A linha mais cheia define as colunas. */
+const GRID = { cols: 6, rows: 3 };
+
+/** O tamanho de UMA celula, em pixels da imagem original. */
+const FRAME = { w: 100, h: 173 };
+
+/** Uma sequencia de quadros: as colunas que ela usa, na linha em que ela vive. */
+interface Clip {
+  row: number;
+  cols: number[];
+  /** Quadros por segundo. Corrida pede mais que caminhada. */
+  fps: number;
+  /** Repete em laco, ou toca uma vez e segura o ultimo quadro. */
+  loop: boolean;
+}
+
+/**
+ * As poses da folha.
+ *
+ * A leitura da imagem: a primeira linha caminha (quatro poses) e termina numa
+ * queda; a segunda e um ciclo de corrida de seis; a terceira avanca empurrando
+ * e termina se machucando. Os nomes aqui descrevem a POSE, nao o uso -- quem
+ * decide qual pose serve a qual momento e o `MOOD_CLIP` logo abaixo.
+ */
+const CLIPS = {
+  walk: { row: 0, cols: [0, 1, 2, 3], fps: 8, loop: true },
+  slide: { row: 0, cols: [4], fps: 1, loop: false },
+  run: { row: 1, cols: [0, 1, 2, 3, 4, 5], fps: 12, loop: true },
+  push: { row: 2, cols: [0, 1, 2, 3], fps: 8, loop: true },
+  hurt: { row: 2, cols: [4], fps: 1, loop: false },
+} satisfies Record<string, Clip>;
+
+/**
+ * Que pose cada humor usa.
+ *
+ * Esta camada existe para o resto do app nunca falar em "linha 2, coluna 4".
+ * As telas pedem `mood="cheer"`; trocar a folha de arte por outra, com outra
+ * ordem de quadros, mexe so nesta tabela e em `CLIPS`.
+ */
+const MOOD_CLIP: Record<HeroMood, keyof typeof CLIPS> = {
+  // Parado nao existe nesta folha. Caminhar devagar le como "esperando voce",
+  // que e exatamente o papel dele na tela inicial.
+  idle: 'walk',
+  cheer: 'push',
+  sad: 'hurt',
+  focus: 'run',
+};
 
 export type HeroMood = 'idle' | 'cheer' | 'sad' | 'focus';
 
-const SIZES = {
-  sm: 56,
-  md: 88,
-  lg: 132,
-} as const;
+/** Altura renderizada. A largura sai da proporcao real do quadro. */
+const SIZES = { sm: 64, md: 104, lg: 156 } as const;
 
 export function Hero({
   mood = 'idle',
@@ -34,185 +99,122 @@ export function Hero({
 }: {
   mood?: HeroMood;
   size?: keyof typeof SIZES;
-  /** Classe de COR (text-*): tinge o capuz, o cachecol e o brilho. */
+  /** Classe de COR (text-*): tinge o halo atras do personagem. */
   accent?: string;
   className?: string;
 }) {
-  const px = SIZES[size];
+  const clip = CLIPS[MOOD_CLIP[mood]];
+  const [frame, setFrame] = useState(0);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
 
-  // O corpo inteiro ganha o movimento do humor; os olhos e a boca sao trocados
-  // por pose. Separar os dois e o que permite comemorar sem redesenhar o rosto.
-  const bodyAnimation =
-    mood === 'cheer'
-      ? 'animate-cheer'
-      : mood === 'sad'
-        ? 'animate-slump'
-        : mood === 'focus'
-          ? 'animate-float'
-          : 'animate-breathe';
+  // Sem o arquivo em disco a tela nao pode quebrar: o app inteiro ja usa o
+  // personagem, e um 404 deixaria buracos no rodape de toda licao.
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setStatus('ready');
+    img.onerror = () => setStatus('missing');
+    img.src = SHEET_URL;
+  }, []);
+
+  /*
+   * O laco de quadros.
+   *
+   * Reinicia quando o humor muda -- por isso `mood` esta nas dependencias e
+   * nao so o clip: voltar ao quadro zero e o que faz a comemoracao ser vista
+   * desde o comeco a cada acerto, em vez de entrar no meio do movimento.
+   */
+  const frames = clip.cols.length;
+  const holdRef = useRef(false);
+
+  useEffect(() => {
+    setFrame(0);
+    holdRef.current = false;
+
+    // Quem pediu menos movimento recebe a pose parada, nao a sequencia.
+    const still =
+      frames <= 1 ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    if (still) return;
+
+    const timer = window.setInterval(() => {
+      setFrame((current) => {
+        const next = current + 1;
+        if (next < frames) return next;
+        if (clip.loop) return 0;
+        // Sequencia que nao repete para no ultimo quadro e fica la.
+        holdRef.current = true;
+        return current;
+      });
+    }, 1000 / clip.fps);
+
+    return () => window.clearInterval(timer);
+  }, [mood, frames, clip.fps, clip.loop]);
+
+  const height = SIZES[size];
+  const scale = height / FRAME.h;
+  const width = Math.round(FRAME.w * scale);
+  const col = clip.cols[Math.min(frame, frames - 1)];
+
+  if (status === 'missing') {
+    return <MissingSheet width={width} height={height} accent={accent} className={className} />;
+  }
 
   return (
     <div
-      className={`${accent} ${className}`}
-      // Decorativo: quem le com leitor de tela nao ganha nada em ouvir a
-      // descricao de um boneco, e o estado real ja esta escrito na tela ao lado.
+      className={`relative ${accent} ${className}`}
+      style={{ width, height }}
+      // Decorativo: o estado real ja esta escrito em texto ao lado, e descrever
+      // um boneco nao acrescenta nada a quem usa leitor de tela.
       aria-hidden="true"
     >
-      <svg
-        width={px}
-        height={px}
-        viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="overflow-visible"
-      >
-        {/* Sombra no chao: ancora o personagem, senao ele flutua no vazio. */}
-        <ellipse
-          cx="50"
-          cy="92"
-          rx={mood === 'cheer' ? 14 : 18}
-          ry="3.5"
-          fill="currentColor"
-          opacity="0.18"
-          className="transition-all duration-300"
-        />
+      {/* Halo do contexto atras do personagem -- e o que o liga a cor da tela
+          em que ele esta (verde no acerto, rosa no erro, violeta no russo). */}
+      <span
+        className="absolute inset-x-0 bottom-0 top-1/4 rounded-full bg-current opacity-[0.12] blur-xl"
+        aria-hidden
+      />
 
-        <g className={bodyAnimation} style={{ transformOrigin: '50px 90px' }}>
-          {/* --- Corpo / manto --- */}
-          <path
-            d="M50 44
-               C38 44 31 53 29 66
-               L26 86
-               C26 88.5 28 90 31 90
-               L69 90
-               C72 90 74 88.5 74 86
-               L71 66
-               C69 53 62 44 50 44 Z"
-            fill="currentColor"
-            opacity="0.9"
-          />
-          {/* Dobra do manto: uma linha so, para o volume nao ficar chapado. */}
-          <path
-            d="M50 52 L50 90"
-            stroke="#0B0E1A"
-            strokeWidth="1.5"
-            opacity="0.25"
-            strokeLinecap="round"
-          />
+      <div
+        className="relative h-full w-full transition-opacity duration-200"
+        style={{
+          opacity: status === 'ready' ? 1 : 0,
+          backgroundImage: `url(${SHEET_URL})`,
+          // A folha inteira e escalada junto com o quadro, e so entao deslocada.
+          backgroundSize: `${GRID.cols * FRAME.w * scale}px ${GRID.rows * FRAME.h * scale}px`,
+          backgroundPosition: `-${col * FRAME.w * scale}px -${clip.row * FRAME.h * scale}px`,
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+    </div>
+  );
+}
 
-          {/* --- Bracos --- */}
-          {/* Comemorando, os dois sobem. Nos outros humores descem ao lado. */}
-          <g className="transition-transform duration-300">
-            <path
-              d={
-                mood === 'cheer'
-                  ? 'M31 62 L20 44'
-                  : mood === 'sad'
-                    ? 'M31 64 L25 82'
-                    : 'M31 62 L26 78'
-              }
-              stroke="currentColor"
-              strokeWidth="7"
-              strokeLinecap="round"
-              opacity="0.9"
-            />
-            <path
-              d={
-                mood === 'cheer'
-                  ? 'M69 62 L80 44'
-                  : mood === 'sad'
-                    ? 'M69 64 L75 82'
-                    : 'M69 62 L74 78'
-              }
-              stroke="currentColor"
-              strokeWidth="7"
-              strokeLinecap="round"
-              opacity="0.9"
-            />
-          </g>
-
-          {/* --- Cachecol: o acento claro que separa cabeca de corpo --- */}
-          <path
-            d="M36 46 C42 51 58 51 64 46 L64 52 C58 56 42 56 36 52 Z"
-            fill="currentColor"
-            opacity="0.55"
-          />
-
-          {/* --- Cabeca --- */}
-          <circle cx="50" cy="30" r="17" fill="#F2F4FF" />
-
-          {/* Capuz por cima da cabeca, cobrindo o topo. */}
-          <path
-            d="M33 30 C33 20 40 13 50 13 C60 13 67 20 67 30 L67 26 C67 24 65 23 63 24 C59 20 55 18 50 18 C45 18 41 20 37 24 C35 23 33 24 33 26 Z"
-            fill="currentColor"
-          />
-
-          {/* --- Rosto --- */}
-          {mood === 'sad' ? (
-            // Olhos fechados em arco para baixo: desanimo sem virar choro.
-            <>
-              <path d="M40 30 q4 4 8 0" stroke="#0B0E1A" strokeWidth="2.4" strokeLinecap="round" />
-              <path d="M52 30 q4 4 8 0" stroke="#0B0E1A" strokeWidth="2.4" strokeLinecap="round" />
-              <path d="M44 39 q6 -4 12 0" stroke="#0B0E1A" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-            </>
-          ) : (
-            <>
-              {/*
-                A piscada e uma escala vertical dos olhos, com origem no centro
-                deles -- por isso cada olho tem o proprio `transformOrigin`.
-                Comemorando ninguem pisca: o olho fica fechado de felicidade.
-              */}
-              {mood === 'cheer' ? (
-                <>
-                  <path d="M40 32 q4 -5 8 0" stroke="#0B0E1A" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-                  <path d="M52 32 q4 -5 8 0" stroke="#0B0E1A" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-                  {/* Boca aberta de sorriso. */}
-                  <path d="M44 38 q6 7 12 0 q-6 3 -12 0 Z" fill="#0B0E1A" />
-                </>
-              ) : (
-                <>
-                  <ellipse
-                    cx="44"
-                    cy="31"
-                    rx="2.6"
-                    ry="3.4"
-                    fill="#0B0E1A"
-                    className="animate-blink"
-                    style={{ transformOrigin: '44px 31px' }}
-                  />
-                  <ellipse
-                    cx="56"
-                    cy="31"
-                    rx="2.6"
-                    ry="3.4"
-                    fill="#0B0E1A"
-                    className="animate-blink"
-                    style={{ transformOrigin: '56px 31px' }}
-                  />
-                  <path
-                    d="M45 38 q5 4 10 0"
-                    stroke="#0B0E1A"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </>
-              )}
-            </>
-          )}
-
-          {/*
-            Faiscas da comemoracao. So existem neste humor -- particula parada
-            na tela o tempo todo vira sujeira, e o brilho perde o significado.
-          */}
-          {mood === 'cheer' && (
-            <g className="animate-pop">
-              <path d="M22 26 l2 -6 2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 Z" fill="currentColor" />
-              <path d="M76 34 l1.5 -4.5 1.5 4.5 4.5 1.5 -4.5 1.5 -1.5 4.5 -1.5 -4.5 -4.5 -1.5 Z" fill="currentColor" />
-            </g>
-          )}
-        </g>
-      </svg>
+/**
+ * O lugar do personagem enquanto a arte nao chegou.
+ *
+ * Nao desenha um substituto: mostra um vazio silencioso do tamanho certo, para
+ * o layout ficar identico ao que sera com a folha no lugar. Um boneco
+ * provisorio aqui seria confundido com o resultado final.
+ */
+function MissingSheet({
+  width,
+  height,
+  accent,
+  className,
+}: {
+  width: number;
+  height: number;
+  accent: string;
+  className: string;
+}) {
+  return (
+    <div
+      className={`relative ${accent} ${className}`}
+      style={{ width, height }}
+      aria-hidden="true"
+      title="Falta apps/web/public/hero-sprite.png"
+    >
+      <span className="absolute inset-0 rounded-full bg-current opacity-[0.08]" />
     </div>
   );
 }
