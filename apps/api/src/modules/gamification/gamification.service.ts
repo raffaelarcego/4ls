@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { levelFromXp } from './levels';
 
 /** Conquistas avaliadas apos cada sessao concluida. */
 const ACHIEVEMENT_RULES: Array<{
@@ -95,10 +96,16 @@ export class GamificationService {
       }),
     ]);
 
+    const total = totalAgg._sum.xpEarned ?? 0;
+
     return {
       today: todayAgg._sum.xpEarned ?? 0,
       week: weekAgg._sum.xpEarned ?? 0,
-      total: totalAgg._sum.xpEarned ?? 0,
+      total,
+      // O nivel viaja junto com o XP porque e derivado dele: calcular no
+      // frontend duplicaria a curva em dois lugares, e a curva e regra de
+      // produto -- ela precisa de um dono so.
+      progress: levelFromXp(total),
     };
   }
 

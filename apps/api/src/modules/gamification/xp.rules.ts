@@ -10,6 +10,9 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   // Sem ler as letras nada do resto acontece: o bloco vale o mesmo que montar
   // frase, senao o aluno o trataria como aquecimento.
   alphabet: 20,
+  // Mesma faixa: montar a primeira frase custa tanto quanto ler a primeira
+  // palavra, e e o degrau que decide se o idioma continua ou nao.
+  foundation: 20,
   // Ver os quatro idiomas lado a lado e leitura guiada: vale como vocabulario.
   contrast: 15,
   // Produzir a mesma frase nos quatro de memoria e quase a producao quadrupla,

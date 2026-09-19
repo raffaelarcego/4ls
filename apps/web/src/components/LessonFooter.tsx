@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useHeightVar } from '../lib/metrics';
+import { Hero } from './Hero';
 
 type Tone = 'neutral' | 'correct' | 'wrong';
 
@@ -52,9 +53,27 @@ export function LessonFooter({
       className={`fixed inset-x-0 bottom-[var(--tabbar-h,0px)] z-40 border-t pb-[var(--footer-safe,0px)] ${style.wrap}`}
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
-          {title && <p className={`font-serif text-base font-semibold ${style.title}`}>{title}</p>}
-          {detail && <div className={`text-sm ${style.detail}`}>{detail}</div>}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/*
+            O personagem reage aqui, e nao em cada runner.
+            Este rodape e o unico ponto por onde TODA licao passa para dizer
+            "acertou" ou "errou" -- alfabeto, fundamentos, ditado, revisao,
+            gramatica. Pendurar a reacao nele faz os doze blocos ganharem
+            comemoracao de uma vez, em vez de doze copias da mesma logica.
+          */}
+          {tone !== 'neutral' && (
+            <Hero
+              key={`${tone}-${title ?? ''}`}
+              mood={tone === 'correct' ? 'cheer' : 'sad'}
+              size="sm"
+              accent={tone === 'correct' ? 'text-grass' : 'text-cardinal'}
+              className="shrink-0"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            {title && <p className={`font-serif text-base font-bold ${style.title}`}>{title}</p>}
+            {detail && <div className={`text-sm ${style.detail}`}>{detail}</div>}
+          </div>
         </div>
         <div className="flex shrink-0 gap-2 sm:w-auto">{children}</div>
       </div>

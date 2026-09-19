@@ -10,6 +10,7 @@ import { CanDoModule } from './modules/cando/can-do.module';
 import { ConceptsModule } from './modules/concepts/concepts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErrorsModule } from './modules/errors/errors.module';
+import { FoundationModule } from './modules/foundation/foundation.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { HealthModule } from './modules/health/health.module';
@@ -33,6 +34,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     VocabularyModule,
     ConceptsModule,
     AlphabetModule,
+    FoundationModule,
     StructureModule,
     CanDoModule,
     ReviewModule,

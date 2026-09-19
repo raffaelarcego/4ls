@@ -12,6 +12,7 @@ import { AlphabetRunner } from './AlphabetRunner';
 import { CanDoCompareRunner } from './CanDoCompareRunner';
 import { CanDoContrastRunner } from './CanDoContrastRunner';
 import { DictationRunner } from './DictationRunner';
+import { FoundationRunner } from './FoundationRunner';
 import { ListeningRunner } from './ListeningRunner';
 import { ProductionRunner } from './ProductionRunner';
 import { SpeakingRunner } from './SpeakingRunner';
@@ -69,6 +70,12 @@ export function GenericRunner({
   // os outros blocos em russo ensinam a reconhecer o desenho da palavra.
   if (activity.type === 'alphabet') {
     return <AlphabetRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Depois de ler as letras vem montar a frase com elas. Sem este degrau, a
+  // aula de estrutura fala de uma regra de ordem para quem ainda nao tem
+  // pronome nem verbo -- que era o caso em alemao e em russo.
+  if (activity.type === 'foundation') {
+    return <FoundationRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'structure') {
     return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;

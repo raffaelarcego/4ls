@@ -20,6 +20,7 @@ function language(overrides: Partial<LanguageState> = {}): LanguageState {
     errorCounts: {},
     recentTypes: [],
     needsAlphabet: false,
+    needsFoundation: false,
     ...overrides,
   };
 }
@@ -183,11 +184,11 @@ describe('modo alfabeto', () => {
   });
 
   it('ocupa a vaga de estrutura, sem virar um terceiro obrigatorio', () => {
-    const comAlfabeto = planSession([russo()], 30);
-    const semAlfabeto = planSession([language({ code: 'ru' })], 30);
+    const plan = planSession([russo()], 30);
+    const obrigatorios = plan.activities.filter((a) => a.type !== 'review');
 
-    expect(comAlfabeto.activities).toHaveLength(semAlfabeto.activities.length);
-    expect(comAlfabeto.totalMinutes).toBe(30);
+    expect(obrigatorios.map((a) => a.type)).toEqual(['alphabet', 'vocabulary']);
+    expect(plan.totalMinutes).toBe(30);
   });
 
   it('nao devolve estrutura pelo ranqueamento', () => {
@@ -226,6 +227,168 @@ describe('modo alfabeto', () => {
 
     expect(plan.activities.find((a) => a.type === 'alphabet')?.reason).toContain('Ler as letras');
     expect(pillarForType('alphabet')).toBe(Pillar.LEARN);
+  });
+});
+
+/**
+ * O degrau entre o alfabeto e a estrutura.
+ *
+ * O aluno nao conseguia acompanhar alemao nem russo porque nao sabia NADA dos
+ * dois -- nem pronome, nem verbo, nem ordem. Ler os caracteres resolveu so
+ * metade disso no russo; no alemao nao havia degrau nenhum, e a aula de
+ * estrutura ja pressupoe uma frase para reorganizar.
+ */
+describe('modo fundamentos', () => {
+  const alemao = () => language({ code: 'de', name: 'Deutsch', needsFoundation: true });
+
+  it('troca estrutura por fundamentos enquanto o aluno nao monta frase', () => {
+    const ordem = types(alemao());
+
+    expect(ordem).toContain('foundation');
+    expect(ordem).not.toContain('structure');
+    // O vocabulario continua: e o conceito do dia, o mesmo dos outros idiomas.
+    expect(ordem).toContain('vocabulary');
+  });
+
+  it('ocupa a vaga de estrutura, sem virar um terceiro obrigatorio', () => {
+    const plan = planSession([alemao()], 30);
+    const obrigatorios = plan.activities.filter((a) => a.type !== 'review');
+
+    expect(obrigatorios.map((a) => a.type)).toEqual(['foundation', 'vocabulary']);
+    expect(plan.totalMinutes).toBe(30);
+  });
+
+  it('nao devolve estrutura pelo ranqueamento', () => {
+    const state = alemao();
+    state.skills.grammar = 1;
+
+    expect(types(state, 40)).not.toContain('structure');
+  });
+
+  it('nao duplica o bloco no tempo que sobra', () => {
+    // A trilha serve uma licao por vez: um segundo bloco no mesmo dia repetiria
+    // exatamente a mesma aula.
+    const state = alemao();
+    state.skills.grammar = 1;
+
+    expect(types(state, 40).filter((t) => t === 'foundation')).toHaveLength(1);
+  });
+
+  /**
+   * A ordem entre os dois degraus nao e negociavel: quem ainda nao decodifica o
+   * cirilico nao tem o que fazer numa aula que monta frases em cirilico.
+   */
+  it('cede a vez ao alfabeto quando os dois estao pendentes', () => {
+    const ordem = types(
+      language({ code: 'ru', name: 'Русский', needsAlphabet: true, needsFoundation: true }),
+    );
+
+    expect(ordem).toContain('alphabet');
+    expect(ordem).not.toContain('foundation');
+  });
+
+  it('assume a vaga assim que o alfabeto fecha', () => {
+    const ordem = types(
+      language({ code: 'ru', name: 'Русский', needsAlphabet: false, needsFoundation: true }),
+    );
+
+    expect(ordem).toContain('foundation');
+    expect(ordem).not.toContain('alphabet');
+  });
+
+  it('so afeta o idioma que precisa', () => {
+    const plan = planSession(
+      [
+        language({ code: 'en', minutesPerDay: 15 }),
+        language({ code: 'de', name: 'Deutsch', minutesPerDay: 15, needsFoundation: true }),
+      ],
+      30,
+    );
+    const tipos = (code: string) =>
+      plan.activities.filter((a) => a.languageCode === code).map((a) => a.type);
+
+    expect(tipos('en')).toContain('structure');
+    expect(tipos('de')).toContain('foundation');
+  });
+
+  it('explica por que o bloco esta ali e o coloca sob LEARN', () => {
+    const plan = planSession([alemao()], 30);
+
+    expect(plan.activities.find((a) => a.type === 'foundation')?.reason).toContain(
+      'primeiras peças',
+    );
+    expect(pillarForType('foundation')).toBe(Pillar.LEARN);
+  });
+});
+
+/**
+ * O ranqueamento pontua `100 - competencia`, entao um idioma que o aluno nao
+ * fala ganha escuta e gramatica no TOPO da fila -- justamente por ele nao saber
+ * nada. Com 15 minutos por idioma, isso enchia metade do tempo de alemao e de
+ * russo com dialogo falado e exercicio gerado por IA para quem estava na
+ * primeira licao do alfabeto, e era o que sobrava do "nao entendo nada do que
+ * aparece" depois de o bloco de fundamentos existir.
+ */
+describe('ranqueamento antes da estrutura', () => {
+  const zerado = (overrides: Partial<LanguageState>) =>
+    language({
+      minutesPerDay: 15,
+      skills: {
+        listening: 2,
+        reading: 2,
+        writing: 2,
+        speaking: 2,
+        vocabScore: 2,
+        grammar: 2,
+      },
+      ...overrides,
+    });
+
+  it.each([
+    ['alfabeto', { code: 'ru', name: 'Русский', needsAlphabet: true }, 'alphabet'],
+    ['fundamentos', { code: 'de', name: 'Deutsch', needsFoundation: true }, 'foundation'],
+  ])('em modo %s, so entram os obrigatorios', (_modo, overrides, esperado) => {
+    const tipos = types(zerado(overrides), 15);
+
+    expect(tipos).toEqual([esperado, 'vocabulary']);
+  });
+
+  it('nao serve escuta nem gramatica a quem ainda nao le o idioma', () => {
+    // Competencia no chao e o que MAIS puxava esses dois para cima.
+    const tipos = types(zerado({ code: 'ru', name: 'Русский', needsAlphabet: true }), 15);
+
+    expect(tipos).not.toContain('listening');
+    expect(tipos).not.toContain('grammar');
+    expect(tipos).not.toContain('dictation');
+    expect(tipos).not.toContain('speaking');
+  });
+
+  it('devolve o tempo aos obrigatorios em vez de encurtar o dia', () => {
+    const plan = planSession([zerado({ code: 'de', needsFoundation: true })], 15);
+
+    expect(plan.totalMinutes).toBe(15);
+    // Antes eram quatro blocos de 3 a 4 minutos; agora os dois que ele consegue
+    // acompanhar dividem o tempo inteiro entre si.
+    for (const activity of plan.activities) {
+      expect(activity.plannedMinutes).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it('a revisao vencida continua passando na frente', () => {
+    // O que trava a progressao trava do mesmo jeito aqui: pular a revisao
+    // deixaria os cards vencendo enquanto o aluno sobe a escada.
+    const tipos = types(zerado({ code: 'de', needsFoundation: true, dueReviews: 20 }), 15);
+
+    expect(tipos[0]).toBe('review');
+    expect(tipos).toContain('foundation');
+  });
+
+  it('nao toca no idioma que ja passou dos dois degraus', () => {
+    const tipos = types(zerado({ code: 'en' }), 15);
+
+    expect(tipos).toContain('structure');
+    // O ranqueamento continua preenchendo o tempo que sobra, como sempre fez.
+    expect(tipos.length).toBeGreaterThan(2);
   });
 });
 

@@ -62,8 +62,33 @@ export interface DashboardData {
   session: StudySession;
   languages: DashboardLanguage[];
   streak: { current: number; longest: number };
-  xp: { today: number; week: number; total: number };
+  xp: XpSummary;
   aiEnabled: boolean;
+}
+
+/**
+ * Onde o aluno esta na curva de nivel.
+ *
+ * Vem pronto do backend, e nao calculado aqui, porque a curva e regra de
+ * produto: ter a formula nos dois lados garantiria que um dia eles divergem e
+ * a barra passaria a discordar do nivel que o servidor credita.
+ */
+export interface LevelProgress {
+  level: number;
+  /** "Aprendiz", "Viajante", "Mestre das Quatro"... */
+  title: string;
+  xpIntoLevel: number;
+  xpForLevel: number;
+  xpRemaining: number;
+  /** 0-99. Nunca 100: ao encher, o nivel sobe e ela zera. */
+  percent: number;
+}
+
+export interface XpSummary {
+  today: number;
+  week: number;
+  total: number;
+  progress: LevelProgress;
 }
 
 /**
@@ -262,6 +287,52 @@ export interface AlphabetLesson {
   words: AlphabetWord[];
   /** Letras de licoes anteriores -- servem de distrator plausivel no treino. */
   review: AlphabetLetter[];
+  mastery: number;
+  complete: boolean;
+}
+
+/** Uma peça de frase nova: uma palavra, com o papel que ela cumpre. */
+export interface FoundationPiece {
+  term: string;
+  meaning: string;
+  /** Como soa, soletrado em português. */
+  reading: string;
+  /** O que esta peça exige e o português não exige. */
+  note?: string;
+  /** Só existe nas peças que parecem outra coisa — o "ja" alemão que se lê "iá". */
+  trap?: string;
+}
+
+/** Um pedaço de frase, com o papel dele: QUEM, SER, ONDE, AÇÃO, NÃO. */
+export interface SentencePart {
+  chunk: string;
+  label: string;
+}
+
+/** Uma frase montável apenas com as peças já ensinadas. */
+export interface FoundationSentence {
+  text: string;
+  reading: string;
+  meaning: string;
+  /** A frase quebrada, na ordem do idioma. É a aula de montagem. */
+  parts: SentencePart[];
+}
+
+/** A aula de fundamentos do dia, para um idioma que o aluno começa do zero. */
+export interface FoundationLesson {
+  lessonId: string;
+  languageCode: string;
+  languageName: string;
+  index: number;
+  total: number;
+  title: string;
+  goal: string;
+  /** A regra de montagem em português — o texto que ele não deduz sozinho. */
+  rule: string;
+  pieces: FoundationPiece[];
+  sentences: FoundationSentence[];
+  /** Peças de lições anteriores — servem de distrator plausível no treino. */
+  review: FoundationPiece[];
   mastery: number;
   complete: boolean;
 }

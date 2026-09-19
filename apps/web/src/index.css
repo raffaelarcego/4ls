@@ -30,6 +30,12 @@
       abas. `clip` corta sem criar container.
     */
     overflow-x: clip;
+    /*
+      O tema e escuro por construcao, entao os controles nativos (barra de
+      rolagem, campo de data, menu de select) precisam saber disso -- senao
+      aparecem brancos no meio da tela escura.
+    */
+    color-scheme: dark;
   }
   body {
     @apply bg-snow font-sans text-eel antialiased;
@@ -40,6 +46,15 @@
       quando a palavra realmente nao cabe -- nao afeta o resto do texto.
     */
     overflow-wrap: break-word;
+    /*
+      Ceu de expedicao: dois halos frios muito suaves no topo. Fixos, para nao
+      andarem com a rolagem, e fracos o bastante para nunca competirem com o
+      conteudo -- eles existem para o fundo nao ser uma chapa morta.
+    */
+    background-image:
+      radial-gradient(60rem 28rem at 12% -8%, rgba(76, 201, 240, 0.1), transparent 60%),
+      radial-gradient(48rem 24rem at 92% -4%, rgba(177, 92, 255, 0.1), transparent 60%);
+    background-attachment: fixed;
   }
   /* Nada de texto selecionado por acidente ao clicar rapido nos botoes de resposta. */
   button {
@@ -48,56 +63,77 @@
 }
 
 @layer components {
+  /*
+    Painel. A borda clara de cima e o que da volume no escuro: sem ela, cartao
+    escuro sobre fundo escuro vira uma mancha sem limite.
+  */
   .card {
-    @apply rounded-lg border border-swan bg-white p-5;
+    @apply rounded-xl border border-swan bg-white p-5;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 2px rgba(0, 0, 0, 0.4);
   }
 
-  /* Botao chapado: sem sombra, sem "pressionar". O estado muda pela cor. */
+  /*
+    Botao com PROFUNDIDADE.
+
+    A borda inferior grossa e a "espessura" da peca, e ela desaparece no toque
+    enquanto o botao desce os mesmos 4px -- o dedo afunda a peca de verdade. E o
+    que separa um botao de app de um botao de jogo, e custa duas linhas.
+
+    `active:` e nao `:hover` porque o alvo e o celular, onde hover nao existe.
+  */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border px-5 py-3
-           text-sm font-semibold
-           transition-colors duration-100
-           disabled:pointer-events-none disabled:opacity-100;
+    @apply relative inline-flex select-none items-center justify-center gap-2
+           rounded-xl border-b-4 px-5 py-3
+           text-sm font-bold uppercase tracking-wide
+           transition-[transform,background-color,border-color] duration-75
+           active:translate-y-[4px] active:border-b-0
+           disabled:pointer-events-none disabled:translate-y-0;
   }
   .btn-primary {
-    @apply btn border-grass bg-grass text-snow
-           hover:border-grass-dark hover:bg-grass-dark
-           disabled:border-swan disabled:bg-swan disabled:text-hare;
+    @apply btn border-b-[#1F9E6E] bg-grass text-snow
+           hover:bg-grass-dark
+           disabled:border-b-swan disabled:bg-swan disabled:text-hare;
   }
   .btn-blue {
-    @apply btn border-macaw bg-macaw text-snow
-           hover:border-macaw-dark hover:bg-macaw-dark
-           disabled:border-swan disabled:bg-swan disabled:text-hare;
+    @apply btn border-b-[#2A8FB0] bg-macaw text-snow
+           hover:bg-macaw-dark
+           disabled:border-b-swan disabled:bg-swan disabled:text-hare;
   }
   .btn-danger {
-    @apply btn border-cardinal bg-cardinal text-snow
-           hover:border-cardinal-dark hover:bg-cardinal-dark;
+    @apply btn border-b-[#C03D50] bg-cardinal text-snow hover:bg-cardinal-dark;
   }
+  /* Peca vazada: mesma espessura, sem preenchimento. */
   .btn-ghost {
-    @apply btn border-swan bg-transparent text-wolf hover:bg-swan/40;
+    @apply btn border border-swan border-b-4 border-b-swan bg-white text-wolf
+           hover:border-hare hover:text-eel;
   }
-  /* Acao secundaria discreta, sem peso visual de botao. */
+  /* Acao secundaria discreta: sem peca, sem profundidade -- ela nao compete. */
   .btn-plain {
-    @apply btn border-transparent bg-transparent px-3 text-hare hover:text-wolf;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3
+           text-sm font-semibold text-hare transition-colors
+           hover:text-eel disabled:pointer-events-none;
   }
 
   .input {
-    @apply w-full rounded-md border border-swan bg-snow px-4 py-3 text-base font-normal
+    @apply w-full rounded-xl border-2 border-swan bg-snow px-4 py-3 text-base font-normal
            text-eel placeholder:text-hare
-           outline-none transition focus:border-grass focus:bg-white;
+           outline-none transition focus:border-macaw;
   }
   .label {
-    @apply mb-1.5 block text-xs font-medium text-wolf;
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-wolf;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded border border-swan px-2.5 py-1 text-xs font-medium text-wolf;
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold
+           border-swan text-wolf;
   }
   .section-title {
-    @apply font-serif text-sm font-semibold text-eel;
+    @apply font-serif text-sm font-bold uppercase tracking-wide text-eel;
   }
   /* Rotulo menor, para subdivisoes dentro de uma secao ja titulada. */
   .section-label {
-    @apply text-xs font-medium text-wolf;
+    @apply text-xs font-semibold text-wolf;
   }
 
   /*
@@ -125,5 +161,52 @@
   */
   .hscroll {
     @apply overflow-x-auto overscroll-x-contain;
+  }
+
+  /*
+    Numero de recompensa: XP, sequencia, nivel. Tabular para nao dancar quando
+    o valor muda, e dourado porque premio tem uma cor so no app inteiro.
+  */
+  .stat {
+    @apply font-mono font-bold tabular-nums text-bee;
+  }
+}
+
+@layer utilities {
+  /*
+    Brilho atras de um elemento -- o no ativo da trilha, o personagem, a barra
+    cheia.
+
+    `drop-shadow` e nao `box-shadow` de proposito: ele aceita `currentColor`, o
+    que faz o brilho herdar a cor de quem chama (`text-grass` brilha verde,
+    `text-humpback` brilha violeta) sem uma classe por cor. E, ao contrario do
+    `box-shadow`, ele segue a FORMA real do elemento -- entao o halo de um no
+    redondo sai redondo, e o de um SVG segue o desenho em vez da caixa.
+
+    A alternativa moderna seria `rgb(from currentColor ...)`, que e mais direta
+    e ainda nova demais para um PWA que roda no navegador do celular.
+  */
+  .glow {
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+  .glow-strong {
+    filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 14px currentColor);
+  }
+
+  /*
+    Quem prefere menos movimento nao recebe nenhum. O personagem inteiro e
+    animacao, entao isto nao e detalhe de acessibilidade -- e a diferenca
+    entre o app ser usavel ou nao para quem tem sensibilidade a movimento.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-breathe,
+    .animate-blink,
+    .animate-cheer,
+    .animate-float,
+    .animate-halo,
+    .animate-sheen,
+    .animate-wiggle {
+      animation: none !important;
+    }
   }
 }

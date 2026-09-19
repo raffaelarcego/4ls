@@ -40,6 +40,16 @@ export interface LanguageState {
    * decorar o DESENHO da frase, nao le-la.
    */
   needsAlphabet: boolean;
+  /**
+   * O idioma ainda tem fundamentos pendentes.
+   *
+   * O degrau seguinte ao alfabeto, e por isso um campo separado: saber ler os
+   * caracteres nao ensina que peca vai onde. Enquanto for verdade, o bloco de
+   * estrutura cede o lugar aos fundamentos -- a aula de estrutura fala de uma
+   * regra de frase pressupondo que o aluno ja tem pronome, verbo e ordem, e
+   * quem nao tem nenhum dos tres nao a acompanha.
+   */
+  needsFoundation: boolean;
 }
 
 export interface PlannedActivity {
@@ -65,6 +75,7 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   vocabulary: Pillar.LEARN,
   structure: Pillar.LEARN,
   alphabet: Pillar.LEARN,
+  foundation: Pillar.LEARN,
   // Ver a mesma frase nos quatro idiomas e aula: o aluno recebe o contraste.
   contrast: Pillar.LEARN,
   // Produzir a mesma frase nos quatro de memoria e uso, nao apresentacao.
@@ -105,6 +116,10 @@ const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   structure: 'grammar',
   // Ligar caractere a som e leitura na sua forma mais basica.
   alphabet: 'reading',
+  // Fundamentos e montagem de frase na forma mais basica: gramatica, como
+  // estrutura -- e o mesmo campo, para o bloco nao melhorar uma nota que
+  // ninguem consulta para decidir o dia seguinte.
+  foundation: 'grammar',
   // Comparar a ordem das pecas entre os quatro idiomas move gramatica.
   contrast: 'grammar',
   // Produzir a mesma frase nos quatro de memoria e escrita, como a producao.
@@ -145,23 +160,46 @@ export function pillarForType(type: string): Pillar {
 const DAILY_TYPES = ['structure', 'vocabulary'] as const;
 
 /**
- * O bloco obrigatorio que substitui `structure` enquanto o alfabeto do idioma
- * nao esta fechado. Ocupa a MESMA vaga, em vez de somar uma terceira: o tempo
- * do idioma nao cresceu, e a frase pode esperar -- a leitura, nao.
+ * Os blocos que podem substituir `structure` enquanto o idioma ainda nao chegou
+ * la. Ocupam a MESMA vaga, em vez de somar uma terceira: o tempo do idioma nao
+ * cresceu, e a aula de frase pode esperar -- ler e saber montar, nao.
  */
 const ALPHABET_TYPE = 'alphabet';
+const FOUNDATION_TYPE = 'foundation';
+
+/** Os tipos que substituem `structure`, na ordem em que se sobrepoem. */
+const PRE_STRUCTURE_TYPES = [ALPHABET_TYPE, FOUNDATION_TYPE] as const;
+
+/**
+ * Qual bloco ocupa a vaga de `structure` neste idioma hoje.
+ *
+ * A ordem entre os dois nao e negociavel, e e por isso que ela vive aqui em vez
+ * de dentro de cada servico: no russo, quem ainda nao decodifica os caracteres
+ * nao tem o que fazer numa aula que monta frases em cirilico. Alfabeto primeiro,
+ * fundamentos depois, estrutura por ultimo. No alemao o primeiro degrau nao
+ * existe (ele ja le alfabeto latino), entao a trilha comeca direto no segundo.
+ */
+function structureSlotFor(
+  state: Pick<LanguageState, 'needsAlphabet' | 'needsFoundation'>,
+): string {
+  if (state.needsAlphabet) return ALPHABET_TYPE;
+  if (state.needsFoundation) return FOUNDATION_TYPE;
+  return 'structure';
+}
 
 /** Os blocos obrigatorios deste idioma hoje, na ordem. */
-export function dailyTypesFor(state: Pick<LanguageState, 'needsAlphabet'>): string[] {
-  return DAILY_TYPES.map((type) =>
-    type === 'structure' && state.needsAlphabet ? ALPHABET_TYPE : type,
-  );
+export function dailyTypesFor(
+  state: Pick<LanguageState, 'needsAlphabet' | 'needsFoundation'>,
+): string[] {
+  const slot = structureSlotFor(state);
+  return DAILY_TYPES.map((type) => (type === 'structure' ? slot : type));
 }
 
 /** Tipos que podem ser iniciados avulso, pelo botao de pratica livre. */
 export const PRACTICABLE_TYPES = [
   'review',
   'alphabet',
+  'foundation',
   'structure',
   'vocabulary',
   'production',
@@ -365,15 +403,45 @@ function planLanguage(
   // 2. Os dois blocos do dia, sem passar pelo ranqueamento.
   const dailyTypes = dailyTypesFor(language);
 
+  /*
+   * O idioma ainda esta antes da aula de estrutura -- alfabeto ou fundamentos.
+   *
+   * Isto muda as duas etapas seguintes, e nao so uma delas, porque o problema
+   * que elas causam juntas e maior que a soma: o ranqueamento pontua
+   * `100 - competencia`, entao um idioma que o aluno nao fala ganha escuta e
+   * gramatica NO TOPO da fila, justamente por ele nao saber nada. Com 15
+   * minutos por idioma isso enchia metade do tempo de alemao e de russo com
+   * dialogo falado e exercicio de gramatica gerado por IA -- para quem estava
+   * na primeira licao do alfabeto. O motor foi desenhado para atacar a
+   * competencia mais fraca, o que e certo quando a fraqueza e uma lacuna e
+   * exatamente errado quando a fraqueza e nao saber o idioma.
+   */
+  const preStructure = dailyTypes.some((type) =>
+    (PRE_STRUCTURE_TYPES as readonly string[]).includes(type),
+  );
+
   dailyTypes.forEach((type, index) => {
     if (remaining < MIN_BLOCK) return;
 
     // O que os obrigatorios seguintes ainda vao precisar.
     const stillReserved = MIN_BLOCK * (dailyTypes.length - index - 1);
+
+    /*
+     * Quanto este bloco pede, antes dos limites.
+     *
+     * Fora do modo pre-estrutura sao 20% do tempo do idioma, e o resto vai para
+     * o ranqueamento. Dentro dele nao ha ranqueamento adiante, entao os
+     * obrigatorios dividem entre si o que sobrou: segurar os 20% aqui deixaria
+     * o tempo restante sem destino nenhum.
+     */
+    const share = preStructure
+      ? Math.floor(remaining / (dailyTypes.length - index))
+      : Math.round(minutes * 0.2);
+
     const blockMinutes = Math.min(
       MAX_BLOCK,
       Math.max(MIN_BLOCK, remaining - stillReserved),
-      Math.max(MIN_BLOCK, Math.round(minutes * 0.2)),
+      Math.max(MIN_BLOCK, share),
     );
 
     blocks.push({
@@ -386,8 +454,17 @@ function planLanguage(
     remaining -= blockMinutes;
   });
 
-  // 3. O tempo restante vai para os tipos com maior necessidade.
-  const ranked = rankTypes(language, dailyTypes);
+  /*
+   * 3. O tempo restante vai para os tipos com maior necessidade -- exceto antes
+   *    da estrutura.
+   *
+   * Nenhum dos candidatos do ranqueamento e acompanhavel por quem ainda nao le
+   * o alfabeto ou nao monta a frase: escuta, ditado, fala, escrita, leitura,
+   * gramatica e tutor pressupoem, todos, um idioma que o aluno ja tem por baixo.
+   * Nao ha um subconjunto seguro a salvar aqui -- por isso a etapa inteira e
+   * pulada, e nao filtrada. O tempo ja foi para os obrigatorios na etapa 2.
+   */
+  const ranked = preStructure ? [] : rankTypes(language, dailyTypes);
 
   for (const candidate of ranked) {
     if (remaining < MIN_BLOCK) break;
@@ -421,6 +498,8 @@ const DAILY_REASON: Record<string, string> = {
     'Diga a mesma coisa nos quatro, de memória, e só depois confira. O contraste fecha o dia.',
   structure: 'Como este idioma monta a frase. Saber a palavra nao basta para dizer a frase.',
   alphabet: 'Ler as letras deste idioma. Sem isso, a palavra é só desenho.',
+  foundation:
+    'As primeiras peças da frase, do zero. Sem elas, toda aula depois soa como língua estrangeira sobre língua estrangeira.',
   vocabulary: 'Os conceitos de hoje, os mesmos que voce ve nos outros idiomas.',
 };
 
@@ -438,13 +517,15 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
   // Os obrigatorios ja entraram: deixa-los concorrer de novo duplicaria o
   // bloco e ainda tiraria a vaga de uma competencia nao atendida hoje.
   //
-  // O alfabeto sai da disputa mesmo quando nao e obrigatorio hoje: ele e uma
-  // escada com uma licao por vez, entao um segundo bloco no mesmo dia repetiria
-  // a mesma licao -- e, com a trilha fechada, nao ha o que servir.
+  // Alfabeto e fundamentos saem da disputa mesmo quando nao sao obrigatorios
+  // hoje: os dois sao escadas com uma licao por vez, entao um segundo bloco no
+  // mesmo dia repetiria a mesma licao -- e, com a trilha fechada, nao ha o que
+  // servir.
   //
-  // `DAILY_TYPES` entra inteiro junto com os de hoje: em modo alfabeto,
-  // `structure` perdeu a vaga obrigatoria e voltaria pela porta do ranqueamento,
-  // devolvendo ao aluno exatamente a aula que ele ainda nao consegue ler.
+  // `DAILY_TYPES` entra inteiro junto com os de hoje: em modo alfabeto ou
+  // fundamentos, `structure` perdeu a vaga obrigatoria e voltaria pela porta do
+  // ranqueamento, devolvendo ao aluno exatamente a aula que ele ainda nao
+  // consegue acompanhar.
   //
   // `contrast` e `compare` tambem ficam de fora, e por um motivo diferente:
   // eles nao sao blocos DESTE idioma. Ja foram criados uma vez, fora da divisao
@@ -454,7 +535,7 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
   const excluded = new Set<string>([
     ...DAILY_TYPES,
     ...dailyTypes,
-    ALPHABET_TYPE,
+    ...PRE_STRUCTURE_TYPES,
     ...CROSS_LANGUAGE_TYPES,
   ]);
   const candidates = Object.keys(SKILL_BY_TYPE).filter((type) => !excluded.has(type));

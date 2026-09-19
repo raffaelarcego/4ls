@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Hero } from '../../components/Hero';
 import { CloseIcon } from '../../components/Icons';
 import { ProgressBar } from '../../components/ProgressBar';
 import { activityTheme, languageTheme, PILLAR_LABEL } from '../../lib/ui';
@@ -88,27 +89,35 @@ export function SessionPage() {
   if (finished) {
     return (
       <Shell>
-        <div className="mx-auto max-w-md space-y-5 pt-12 text-center">
+        <div className="mx-auto max-w-md space-y-5 pt-10 text-center">
+          {/*
+            O maior momento de recompensa do app era um titulo e dois numeros.
+            Aqui o personagem entra grande e comemorando: e a unica tela em que
+            ele ocupa o centro, e e justamente a que o aluno alcanca depois de
+            cumprir o dia inteiro.
+          */}
+          <Hero mood="cheer" size="lg" accent="text-grass" className="mx-auto" />
+
           <div>
-            <h1 className="font-serif text-2xl font-semibold text-eel">Sessão concluída</h1>
+            <h1 className="font-serif text-2xl font-bold text-eel">Missão concluída</h1>
             <p className="text-sm text-wolf">O dia de hoje entrou na sua sequência.</p>
           </div>
 
           <div className="mx-auto flex max-w-xs justify-center gap-3">
-            <Trophy label="XP ganho" value={`+${finished.xp}`} tone="border-bee" />
+            <Trophy label="XP ganho" value={`+${finished.xp}`} tone="border-bee text-bee" />
             <Trophy
               label="Conquistas"
               value={`${finished.achievements.length}`}
-              tone="border-humpback"
+              tone="border-humpback text-humpback"
             />
           </div>
 
           {finished.achievements.length > 0 && (
-            <div className="card border-humpback bg-humpback-soft text-left">
-              <p className="section-title mb-1.5">Novas conquistas</p>
+            <div className="card animate-pop border-humpback bg-humpback-soft text-left">
+              <p className="section-title mb-1.5 text-humpback-dark">Novas conquistas</p>
               <ul className="space-y-1">
                 {finished.achievements.map((name) => (
-                  <li key={name} className="text-sm text-humpback-dark">
+                  <li key={name} className="text-sm font-bold text-humpback-dark">
                     {name}
                   </li>
                 ))}
@@ -247,9 +256,9 @@ function Shell({ header, children }: { header?: React.ReactNode; children: React
   return (
     // 100dvh, e nao 100vh: no celular a barra de endereco entra e sai, e com
     // `vh` a tela fica mais alta que o visivel e o fim do conteudo some.
-    <div className="min-h-[100dvh] bg-white">
+    <div className="min-h-[100dvh] bg-snow">
       {header && (
-        <header className="sticky top-0 z-10 border-b border-swan bg-white pt-[env(safe-area-inset-top)]">
+        <header className="sticky top-0 z-10 border-b border-swan bg-snow pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">{header}</div>
         </header>
       )}
@@ -260,8 +269,9 @@ function Shell({ header, children }: { header?: React.ReactNode; children: React
 
 function Trophy({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className={`flex-1 rounded-lg border bg-white p-3 ${tone}`}>
-      <p className="font-mono text-xl tabular-nums text-eel">{value}</p>
+    <div className={`flex-1 rounded-xl border bg-white p-3 ${tone}`}>
+      {/* O valor herda a cor do trofeu: XP e dourado, conquista e violeta. */}
+      <p className="font-mono text-xl font-bold tabular-nums">{value}</p>
       <p className="text-[11px] leading-tight text-hare">{label}</p>
     </div>
   );

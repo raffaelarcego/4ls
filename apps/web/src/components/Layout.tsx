@@ -5,7 +5,7 @@ import { useHeightVar } from '../lib/metrics';
 import { useBottomBanner } from '../lib/pwa';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
-import { DashboardData } from '../types';
+import { DashboardData, LevelProgress } from '../types';
 import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
 import { InstallButton, InstallPrompt } from './InstallPrompt';
 
@@ -60,7 +60,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* Barra lateral (desktop) */}
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r border-swan bg-snow px-3 py-5 lg:flex">
         <span className="mb-1 px-3 font-serif text-2xl font-semibold tracking-tight text-eel">4L</span>
-        <span className="mb-6 px-3 font-mono text-[11px] text-hare">diário de bordo</span>
+        <span className="mb-6 px-3 font-mono text-[11px] uppercase tracking-widest text-macaw">expedição</span>
 
         <nav className="flex flex-1 flex-col gap-0.5">
           {NAV.map(({ to, label, Icon }) => (
@@ -105,12 +105,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 navegador decidir oferecer. No desktop ele vive na barra
                 lateral, entao aqui some para nao aparecer duas vezes. */}
             <InstallButton className="lg:hidden" />
-            <div className="flex flex-1 items-center justify-end gap-4 sm:gap-5">
-              <Score value={data ? `${data.streak.current}` : '—'} label="dias seguidos" />
+            {/*
+              Sequencia, XP do dia e nivel -- as tres coisas que o aluno olha de
+              relance em qualquer tela. As duas primeiras estavam rotuladas como
+              "min. hoje" e "min. no total", o que era simplesmente errado: o
+              campo sempre foi XP, nunca minuto.
+            */}
+            <div className="flex flex-1 items-center justify-end gap-3 sm:gap-4">
+              <Score value={data ? `${data.streak.current}` : '—'} label="seguidos" tone="text-bee" />
               <span className="h-6 w-px bg-swan" aria-hidden />
-              <Score value={data ? `${data.xp.today}` : '—'} label="min. hoje" />
-              <span className="hidden h-6 w-px bg-swan sm:block" aria-hidden />
-              <Score value={data ? `${data.xp.total}` : '—'} label="min. no total" className="hidden sm:flex" />
+              <Score value={data ? `${data.xp.today}` : '—'} label="XP hoje" tone="text-grass" />
+              <span className="h-6 w-px bg-swan" aria-hidden />
+              <LevelPill progress={data?.xp.progress} />
             </div>
           </div>
         </header>
@@ -163,16 +169,49 @@ export function Layout({ children }: { children: ReactNode }) {
 function Score({
   value,
   label,
+  tone = 'text-eel',
   className = '',
 }: {
   value: string;
   label: string;
+  tone?: string;
   className?: string;
 }) {
   return (
     <span className={`flex flex-col items-end leading-none ${className}`} title={label}>
-      <span className="font-mono text-base font-medium text-eel">{value}</span>
-      <span className="mt-0.5 text-[10px] text-hare">{label}</span>
+      <span className={`font-mono text-base font-bold tabular-nums ${tone}`}>{value}</span>
+      <span className="mt-0.5 text-[10px] uppercase tracking-wide text-hare">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * O nivel, com a barra do progresso dentro da propria pastilha.
+ *
+ * Numero sozinho ("Nv 7") nao puxa ninguem -- a informacao que move e quanto
+ * FALTA. Por isso a barra vive aqui, visivel em todas as telas, e nao so no
+ * dashboard: e o lembrete permanente de que a proxima licao empurra alguma
+ * coisa para a frente.
+ */
+function LevelPill({ progress }: { progress?: LevelProgress }) {
+  return (
+    <span
+      className="flex min-w-[3.25rem] flex-col items-end leading-none"
+      title={
+        progress
+          ? `Nível ${progress.level} — ${progress.title}. Faltam ${progress.xpRemaining} XP.`
+          : 'Nível'
+      }
+    >
+      <span className="font-mono text-base font-bold tabular-nums text-macaw">
+        {progress ? `Nv ${progress.level}` : '—'}
+      </span>
+      <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-swan">
+        <span
+          className="block h-full rounded-full bg-bee transition-[width] duration-500 ease-out"
+          style={{ width: `${progress?.percent ?? 0}%` }}
+        />
+      </span>
     </span>
   );
 }

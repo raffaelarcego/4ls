@@ -8,6 +8,7 @@ import { GamificationService } from '../gamification/gamification.service';
 import { SESSION_COMPLETION_XP, xpForActivity } from '../gamification/xp.rules';
 import { ReviewService } from '../review/review.service';
 import { AlphabetService } from '../alphabet/alphabet.service';
+import { FoundationService } from '../foundation/foundation.service';
 import {
   dailyTypesFor,
   LanguageState,
@@ -38,6 +39,7 @@ export class StudyService {
     private readonly gamification: GamificationService,
     private readonly ai: AiRouterService,
     private readonly alphabet: AlphabetService,
+    private readonly foundation: FoundationService,
   ) {}
 
   /**
@@ -105,6 +107,7 @@ export class StudyService {
         },
         errorCounts: Object.fromEntries(errorRows.map((e) => [e.category, e.occurrences])),
         needsAlphabet: await this.alphabet.needsAlphabet(userId, code),
+        needsFoundation: await this.foundation.needsFoundation(userId, code),
         recentTypes: recentActivities
           .filter((a) => a.language.code === code)
           .slice(0, 6)
@@ -537,6 +540,9 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // Decodificar letra a som e leitura -- mesma competencia que o motor usa para
   // ranquear o bloco.
   alphabet: 'reading',
+  // Montar a frase com as primeiras pecas e gramatica, como estrutura -- e o
+  // mesmo campo que o mission engine usa para ranquear os dois.
+  foundation: 'grammar',
 };
 
 type SessionWithActivities = {

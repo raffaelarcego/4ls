@@ -79,6 +79,7 @@ export interface ActivityTheme {
 
 const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   alphabet: { label: 'Alfabeto', blurb: 'Ler as letras antes das palavras' },
+  foundation: { label: 'Fundamentos', blurb: 'As primeiras peças da frase, do zero' },
   review: { label: 'Revisão', blurb: 'Cards que venceram hoje' },
   vocabulary: { label: 'Vocabulário', blurb: 'O mesmo conceito nos 4 idiomas' },
   structure: { label: 'Estrutura', blurb: 'Como montar a frase neste idioma' },
