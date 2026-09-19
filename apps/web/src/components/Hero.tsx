@@ -29,10 +29,12 @@ import { useEffect, useRef, useState } from 'react';
  * Estes numeros sao a unica coisa que muda quando a arte muda. Estao no topo,
  * juntos e sozinhos, exatamente por isso.
  *
- * ATENCAO -- os valores abaixo sao uma LEITURA da folha, nao uma medicao: a
- * imagem foi descrita, nao medida. Se o personagem aparecer cortado ou
- * "pulando" entre poses, o erro esta aqui e em mais lugar nenhum: confira
- * `FRAME` contra a largura real do PNG dividida pelo numero de colunas.
+ * Eles sao MEDIDOS, nao estimados: a arte original nao vinha em grade -- as
+ * poses estavam espalhadas com espacamento irregular, em WebP sem canal alfa.
+ * O script que a reempacotou (fundo recortado por inundacao a partir das
+ * bordas, quadros centrados e encostados no chao) devolveu estes valores.
+ * Trocar a folha por outra significa rodar o reempacotamento de novo e copiar
+ * os numeros que ele imprime.
  * ------------------------------------------------------------------ */
 
 /** Onde o arquivo vive, servido a partir de `apps/web/public/`. */
@@ -42,7 +44,7 @@ const SHEET_URL = '/hero-sprite.png';
 const GRID = { cols: 6, rows: 3 };
 
 /** O tamanho de UMA celula, em pixels da imagem original. */
-const FRAME = { w: 100, h: 173 };
+const FRAME = { w: 128, h: 144 };
 
 /** Uma sequencia de quadros: as colunas que ela usa, na linha em que ela vive. */
 interface Clip {
@@ -55,19 +57,26 @@ interface Clip {
 }
 
 /**
- * As poses da folha.
+ * As poses da folha, conferidas quadro a quadro na imagem reempacotada.
  *
- * A leitura da imagem: a primeira linha caminha (quatro poses) e termina numa
- * queda; a segunda e um ciclo de corrida de seis; a terceira avanca empurrando
- * e termina se machucando. Os nomes aqui descrevem a POSE, nao o uso -- quem
- * decide qual pose serve a qual momento e o `MOOD_CLIP` logo abaixo.
+ * Linha 1: quatro passos de caminhada, e uma queda de lado no fim.
+ * Linha 2: ciclo de corrida completo, seis quadros.
+ * Linha 3: tres de arranque com os bracos para tras, um de esforco (olhos
+ *          fechados, gota de suor) e um caido de bruços.
+ *
+ * `dash` deixa o quarto quadro da linha 3 de fora de proposito: ele e a careta
+ * de esforco que antecede o tropeco, e no meio de um laco de comemoracao o
+ * personagem parecia estar passando mal.
+ *
+ * Os nomes aqui descrevem a POSE, nao o uso -- quem decide qual pose serve a
+ * qual momento e o `MOOD_CLIP` logo abaixo.
  */
 const CLIPS = {
   walk: { row: 0, cols: [0, 1, 2, 3], fps: 8, loop: true },
-  slide: { row: 0, cols: [4], fps: 1, loop: false },
+  trip: { row: 0, cols: [4], fps: 1, loop: false },
   run: { row: 1, cols: [0, 1, 2, 3, 4, 5], fps: 12, loop: true },
-  push: { row: 2, cols: [0, 1, 2, 3], fps: 8, loop: true },
-  hurt: { row: 2, cols: [4], fps: 1, loop: false },
+  dash: { row: 2, cols: [0, 1, 2], fps: 9, loop: true },
+  fallen: { row: 2, cols: [4], fps: 1, loop: false },
 } satisfies Record<string, Clip>;
 
 /**
@@ -81,8 +90,11 @@ const MOOD_CLIP: Record<HeroMood, keyof typeof CLIPS> = {
   // Parado nao existe nesta folha. Caminhar devagar le como "esperando voce",
   // que e exatamente o papel dele na tela inicial.
   idle: 'walk',
-  cheer: 'push',
-  sad: 'hurt',
+  // Comemoracao tambem nao existe -- nenhuma pose levanta os bracos. O arranque
+  // com o peito aberto e a boca sorrindo e a coisa mais proxima de empolgacao
+  // que a folha tem, e funciona porque o texto ao lado ja diz "isso mesmo".
+  cheer: 'dash',
+  sad: 'fallen',
   focus: 'run',
 };
 
