@@ -7,6 +7,14 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   // Montar frase custa mais esforco que reconhecer palavra, e e o bloco que o
   // aluno tende a pular: o XP acompanha o esforco real.
   structure: 20,
+  // Sem ler as letras nada do resto acontece: o bloco vale o mesmo que montar
+  // frase, senao o aluno o trataria como aquecimento.
+  alphabet: 20,
+  // Ver os quatro idiomas lado a lado e leitura guiada: vale como vocabulario.
+  contrast: 15,
+  // Produzir a mesma frase nos quatro de memoria e quase a producao quadrupla,
+  // so que mais curta -- e continua sendo o bloco que mais custa ao aluno.
+  compare: 30,
   grammar: 15,
   // Ditado exige ouvir e escrever: pesa mais que escuta pura (10).
   dictation: 15,

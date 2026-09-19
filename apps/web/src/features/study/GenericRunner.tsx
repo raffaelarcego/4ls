@@ -8,6 +8,9 @@ import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
 import { api, errorMessage } from '../../services/api';
 import { SessionActivity } from '../../types';
+import { AlphabetRunner } from './AlphabetRunner';
+import { CanDoCompareRunner } from './CanDoCompareRunner';
+import { CanDoContrastRunner } from './CanDoContrastRunner';
 import { DictationRunner } from './DictationRunner';
 import { ListeningRunner } from './ListeningRunner';
 import { ProductionRunner } from './ProductionRunner';
@@ -50,6 +53,22 @@ export function GenericRunner({
   // um, mas cobra a mesma frase em todos.
   if (activity.type === 'production') {
     return <ProductionRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Os dois blocos da can-do sao as pontas do dia e leem a mesma funcao: o
+  // contraste ABRE mostrando as quatro respostas juntas, a comparacao FECHA
+  // cobrando as quatro de memoria. A ordem e pedagogica -- intercalar idiomas
+  // antes do contraste explicito e o que sobrecarrega um iniciante --, e quem
+  // a define e o motor da sessao; aqui so se escolhe a tela.
+  if (activity.type === 'contrast') {
+    return <CanDoContrastRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  if (activity.type === 'compare') {
+    return <CanDoCompareRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // O alfabeto vem antes de tudo num idioma que ele nao consegue ler: sem ele,
+  // os outros blocos em russo ensinam a reconhecer o desenho da palavra.
+  if (activity.type === 'alphabet') {
+    return <AlphabetRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'structure') {
     return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
@@ -298,17 +317,16 @@ function SelfAssessedBlock({
   const [score, setScore] = useState<number | null>(null);
 
   const options = [
-    { label: 'Difícil', emoji: '😵', score: 35, className: 'border-cardinal bg-cardinal-soft text-cardinal-dark' },
-    { label: 'Ok', emoji: '🙂', score: 65, className: 'border-bee bg-bee-soft text-bee-dark' },
-    { label: 'Tranquilo', emoji: '😎', score: 90, className: 'border-grass bg-grass-soft text-grass-dark' },
+    { label: 'Difícil', score: 35, className: 'border-cardinal bg-cardinal-soft text-cardinal-dark' },
+    { label: 'Ok', score: 65, className: 'border-bee bg-bee-soft text-bee-dark' },
+    { label: 'Tranquilo', score: 90, className: 'border-grass bg-grass-soft text-grass-dark' },
   ];
 
   return (
     <>
       <div className="space-y-4">
         <div className="card flex flex-col items-center gap-3 text-center">
-          <span className="text-6xl">{instruction.emoji}</span>
-          <p className="max-w-md text-lg font-bold leading-snug">{instruction.text}</p>
+          <p className="max-w-md text-lg leading-snug text-eel">{instruction.text}</p>
           {activity.type === 'tutor' && (
             <Link to="/tutor" className="btn-blue">
               Abrir o tutor
@@ -323,13 +341,10 @@ function SelfAssessedBlock({
               <button
                 key={option.label}
                 onClick={() => setScore(option.score)}
-                className={`flex flex-col items-center gap-1 rounded-2xl border-2 border-b-[4px] px-2 py-4 text-xs font-extrabold uppercase tracking-wide transition active:translate-y-[2px] active:border-b-2 ${
-                  score === option.score ? option.className : 'border-swan bg-white text-wolf hover:bg-snow'
+                className={`tap-target flex items-center justify-center rounded-md border px-2 py-4 text-sm transition-colors ${
+                  score === option.score ? option.className : 'border-swan bg-white text-wolf'
                 }`}
               >
-                <span aria-hidden className="text-3xl">
-                  {option.emoji}
-                </span>
                 {option.label}
               </button>
             ))}

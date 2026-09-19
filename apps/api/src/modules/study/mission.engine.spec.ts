@@ -19,6 +19,7 @@ function language(overrides: Partial<LanguageState> = {}): LanguageState {
     },
     errorCounts: {},
     recentTypes: [],
+    needsAlphabet: false,
     ...overrides,
   };
 }
@@ -82,14 +83,17 @@ describe('orcamento de tempo', () => {
       60,
     );
 
+    // A moldura cross-language sai do total antes da divisao, entao o que se
+    // reparte sao os 51 minutos restantes -- na mesma proporcao 2:1:1.
     const perLanguage = (code: string) =>
       plan.activities
-        .filter((a) => a.languageCode === code)
+        .filter((a) => a.languageCode === code && a.type !== 'contrast' && a.type !== 'compare')
         .reduce((sum, a) => sum + a.plannedMinutes, 0);
 
-    expect(perLanguage('en')).toBe(30);
-    expect(perLanguage('es')).toBe(15);
-    expect(perLanguage('de')).toBe(15);
+    expect(perLanguage('en') + perLanguage('es') + perLanguage('de')).toBe(51);
+    expect(perLanguage('en')).toBe(26);
+    expect(perLanguage('es')).toBe(12);
+    expect(perLanguage('de')).toBe(13);
   });
 
   it('ignora idioma cujo tempo nao cabe num bloco minimo', () => {
@@ -166,6 +170,65 @@ describe('blocos obrigatorios do dia', () => {
   });
 });
 
+describe('modo alfabeto', () => {
+  const russo = () => language({ code: 'ru', name: 'Русский', needsAlphabet: true });
+
+  it('troca estrutura por alfabeto enquanto o aluno nao le as letras', () => {
+    const ordem = types(russo());
+
+    expect(ordem).toContain('alphabet');
+    expect(ordem).not.toContain('structure');
+    // O vocabulario continua: e o conceito do dia, o mesmo dos outros idiomas.
+    expect(ordem).toContain('vocabulary');
+  });
+
+  it('ocupa a vaga de estrutura, sem virar um terceiro obrigatorio', () => {
+    const comAlfabeto = planSession([russo()], 30);
+    const semAlfabeto = planSession([language({ code: 'ru' })], 30);
+
+    expect(comAlfabeto.activities).toHaveLength(semAlfabeto.activities.length);
+    expect(comAlfabeto.totalMinutes).toBe(30);
+  });
+
+  it('nao devolve estrutura pelo ranqueamento', () => {
+    // Gramatica no chao puxaria estrutura para o topo da fila de sobra. Em modo
+    // alfabeto ela nao pode voltar: e a aula que ele ainda nao consegue ler.
+    const state = russo();
+    state.skills.grammar = 1;
+
+    expect(types(state, 40)).not.toContain('structure');
+  });
+
+  it('nao duplica o bloco de alfabeto no tempo que sobra', () => {
+    const state = russo();
+    state.skills.reading = 1;
+
+    expect(types(state, 40).filter((t) => t === 'alphabet')).toHaveLength(1);
+  });
+
+  it('so afeta o idioma que precisa', () => {
+    const plan = planSession(
+      [
+        language({ code: 'en', minutesPerDay: 15 }),
+        language({ code: 'ru', name: 'Русский', minutesPerDay: 15, needsAlphabet: true }),
+      ],
+      30,
+    );
+    const tipos = (code: string) =>
+      plan.activities.filter((a) => a.languageCode === code).map((a) => a.type);
+
+    expect(tipos('en')).toContain('structure');
+    expect(tipos('ru')).toContain('alphabet');
+  });
+
+  it('explica por que o bloco esta ali e o coloca sob LEARN', () => {
+    const plan = planSession([russo()], 30);
+
+    expect(plan.activities.find((a) => a.type === 'alphabet')?.reason).toContain('Ler as letras');
+    expect(pillarForType('alphabet')).toBe(Pillar.LEARN);
+  });
+});
+
 describe('producao quadrupla', () => {
   const quatro = () => [
     language({ code: 'en', minutesPerDay: 15 }),
@@ -185,8 +248,12 @@ describe('producao quadrupla', () => {
     const producao = plan.activities.filter((a) => a.type === 'production');
 
     expect(producao).toHaveLength(1);
-    // No fim porque producao livre precisa do aquecimento dos blocos anteriores.
-    expect(plan.activities[plan.activities.length - 1].type).toBe('production');
+    // No fim porque producao livre precisa do aquecimento dos blocos
+    // anteriores. So o fechamento cross-language (`compare`) vem depois dela:
+    // ele e a moldura do dia, nao um bloco de idioma.
+    const tipos = plan.activities.map((a) => a.type);
+    expect(tipos[tipos.length - 1]).toBe('compare');
+    expect(tipos[tipos.length - 2]).toBe('production');
     expect(pillarForType('production')).toBe(Pillar.LIVE);
   });
 
@@ -225,6 +292,91 @@ describe('producao quadrupla', () => {
     const plan = planSession(quatro(), 60, { includeProduction: true });
 
     expect(plan.rationale).toContain('producao quadrupla');
+  });
+});
+
+describe('moldura cross-language', () => {
+  const quatro = () => [
+    language({ code: 'en', minutesPerDay: 15 }),
+    language({ code: 'es', minutesPerDay: 15 }),
+    language({ code: 'de', minutesPerDay: 15 }),
+    language({ code: 'ru', minutesPerDay: 15 }),
+  ];
+
+  it('abre o dia com o contraste e fecha com a comparacao', () => {
+    // A ordem e a regra da pesquisa: bloquear dentro do idioma, intercalar
+    // entre eles e so tornar o contraste explicito no fim.
+    const tipos = planSession(quatro(), 60).activities.map((a) => a.type);
+
+    expect(tipos[0]).toBe('contrast');
+    expect(tipos[tipos.length - 1]).toBe('compare');
+  });
+
+  it('aparece uma vez cada, e nao uma por idioma', () => {
+    const tipos = planSession(quatro(), 60).activities.map((a) => a.type);
+
+    expect(tipos.filter((t) => t === 'contrast')).toHaveLength(1);
+    expect(tipos.filter((t) => t === 'compare')).toHaveLength(1);
+  });
+
+  it('sai do total, sem estourar o tempo do dia', () => {
+    const plan = planSession(quatro(), 60);
+
+    expect(plan.activities.reduce((sum, a) => sum + a.plannedMinutes, 0)).toBe(60);
+  });
+
+  it('nao rouba os blocos obrigatorios de nenhum idioma', () => {
+    const plan = planSession(quatro(), 60);
+
+    for (const code of ['en', 'es', 'de', 'ru']) {
+      const tipos = plan.activities.filter((a) => a.languageCode === code).map((a) => a.type);
+      expect(tipos, `${code} sem estrutura`).toContain('structure');
+      expect(tipos, `${code} sem vocabulario`).toContain('vocabulary');
+    }
+  });
+
+  it('nao entra com um idioma so -- nao ha o que contrastar', () => {
+    const tipos = types(language({ minutesPerDay: 30 }));
+
+    expect(tipos).not.toContain('contrast');
+    expect(tipos).not.toContain('compare');
+  });
+
+  it('nao entra num dia curto demais, onde comeria a sessao', () => {
+    const tipos = planSession(quatro(), 20).activities.map((a) => a.type);
+
+    expect(tipos).not.toContain('contrast');
+    expect(tipos).not.toContain('compare');
+  });
+
+  it('pertence nominalmente ao idioma prioritario, com o conteudo dos quatro', () => {
+    const plan = planSession(quatro(), 60);
+
+    expect(plan.activities.find((a) => a.type === 'contrast')?.languageCode).toBe('en');
+    expect(plan.activities.find((a) => a.type === 'compare')?.languageCode).toBe('en');
+  });
+
+  it('explica por que cada um esta ali e fica no pilar certo', () => {
+    const plan = planSession(quatro(), 60);
+
+    expect(plan.activities.find((a) => a.type === 'contrast')?.reason).toContain('lado a lado');
+    expect(plan.activities.find((a) => a.type === 'compare')?.reason).toContain('de memória');
+    expect(pillarForType('contrast')).toBe(Pillar.LEARN);
+    expect(pillarForType('compare')).toBe(Pillar.LIVE);
+  });
+
+  it('nao volta como preenchimento no tempo que sobra de um idioma', () => {
+    // Gramatica e escrita no chao puxariam os dois para o topo da fila se eles
+    // fossem ranqueaveis -- e o aluno receberia quatro telas de comparacao,
+    // cada uma dizendo pertencer a um idioma so.
+    const fracos = quatro().map((l) => ({
+      ...l,
+      skills: { ...l.skills, grammar: 1, writing: 1 },
+    }));
+    const tipos = planSession(fracos, 120).activities.map((a) => a.type);
+
+    expect(tipos.filter((t) => t === 'contrast')).toHaveLength(1);
+    expect(tipos.filter((t) => t === 'compare')).toHaveLength(1);
   });
 });
 

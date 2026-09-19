@@ -140,6 +140,132 @@ export interface StructureLesson {
   attempts: number;
 }
 
+/**
+ * Uma peca da frase presa a uma COLUNA da can-do -- e nao a um papel gramatical
+ * do idioma. A coluna e a mesma nos quatro idiomas; o que muda de um para outro
+ * e a ordem em que eles a preenchem, e e essa diferenca de ordem que ensina.
+ *
+ * Uma realizacao pode ter MENOS pecas do que colunas: o espanhol resolve
+ * "Eu sou brasileiro." com "Soy brasileño." e simplesmente nao preenche QUEM.
+ * A coluna vazia e a licao, nao um dado faltando -- quem consome isto tem de
+ * mostrar a ausencia, nunca fechar o buraco.
+ */
+export interface CanDoPart {
+  text: string;
+  /** Nome da coluna, em portugues, tal como vem em `CanDoToday.columns`. */
+  column: string;
+}
+
+/** A mesma ideia resolvida por UM idioma. */
+export interface CanDoRealization {
+  languageCode: string;
+  sentence: string;
+  /** So vem preenchida em escrita nao-latina (russo). */
+  romanization?: string | null;
+  parts?: CanDoPart[];
+  /** Comentario em portugues sobre ESTA frase neste idioma. */
+  note?: string;
+}
+
+/**
+ * Uma ideia da aula, com as quatro realizacoes juntas.
+ *
+ * O agrupamento e por ideia e nao por idioma de proposito: e a ideia que os
+ * quatro compartilham, e so com as quatro realizacoes da MESMA ideia lado a
+ * lado a diferenca de ordem entre elas fica visivel.
+ */
+export interface CanDoSentence {
+  /** A ideia, em portugues -- o gancho comum das realizacoes. */
+  gloss: string;
+  realizations: CanDoRealization[];
+}
+
+/** Comentario curado sobre o que um idioma exige nesta can-do. */
+export interface CanDoNote {
+  languageCode: string;
+  /** O que este idioma exige aqui e o portugues nao exige. */
+  note: string;
+  /** O erro que um falante de portugues comete neste ponto, se houver. */
+  trap?: string;
+}
+
+/** Matricula do aluno num idioma. Nao carrega conteudo: so nome e progresso. */
+export interface CanDoLanguage {
+  code: string;
+  name: string;
+  level: string;
+  mastery: number;
+}
+
+/**
+ * A can-do do dia: uma funcao comunicativa enunciada em portugues e as quatro
+ * realizacoes dela. Serve aos dois blocos que fecham o dia pelas pontas -- o
+ * contraste explicito na abertura e a producao de memoria no encerramento --,
+ * por isso a mesma resposta atende os dois runners.
+ */
+export interface CanDoToday {
+  canDoId: string;
+  /** A funcao, do ponto de vista de quem quer falar. Em portugues. */
+  question: string;
+  goal: string;
+  level: string;
+  /** As colunas da montagem, iguais para os quatro idiomas. */
+  columns: string[];
+  /** Comentario por idioma. Nem todo idioma matriculado aparece aqui. */
+  notes: CanDoNote[];
+  languages: CanDoLanguage[];
+  /** O conteudo: uma entrada por ideia, cada uma com as quatro realizacoes. */
+  sentences: CanDoSentence[];
+  /** Paragrafo curto, em portugues, sobre o que difere entre os quatro. */
+  contrast: string;
+  mastery: number;
+}
+
+export interface CanDoRecordResult {
+  score: number;
+  mastery: number;
+}
+
+/** Uma letra do alfabeto, do jeito que ela precisa ser apresentada. */
+export interface AlphabetLetter {
+  upper: string;
+  lower: string;
+  name: string;
+  /** Ancora de som em portugues, ex. 'j de "janela"'. */
+  sound: string;
+  /**
+   * So existe nas letras que PARECEM latinas e soam diferente (Н Р С В У Х Е).
+   * E o texto mais valioso da tela: e exatamente onde ele le errado com
+   * confianca, e por isso nunca erra sozinho -- erra sempre do mesmo jeito.
+   */
+  trap?: string;
+}
+
+/** Uma palavra legivel apenas com as letras ja ensinadas. */
+export interface AlphabetWord {
+  word: string;
+  meaning: string;
+  /** Como soa, soletrado em portugues. */
+  reading: string;
+}
+
+/** A aula de alfabeto do dia, para um idioma de escrita nao-latina. */
+export interface AlphabetLesson {
+  lessonId: string;
+  languageCode: string;
+  languageName: string;
+  index: number;
+  total: number;
+  title: string;
+  goal: string;
+  letters: AlphabetLetter[];
+  words: AlphabetWord[];
+  /** Letras de licoes anteriores -- servem de distrator plausivel no treino. */
+  review: AlphabetLetter[];
+  mastery: number;
+  complete: boolean;
+}
+
 /** A mesma coisa num idioma que o aluno ja domina, para servir de dica. */
 export interface Scaffold {
   languageCode: string;

@@ -32,6 +32,14 @@ export interface LanguageState {
   errorCounts: Record<string, number>;
   /** Tipos usados nas ultimas sessoes, do mais recente ao mais antigo. */
   recentTypes: string[];
+  /**
+   * O idioma ainda tem alfabeto pendente.
+   *
+   * Enquanto for verdade, o bloco de estrutura do dia cede o lugar ao alfabeto:
+   * ensinar ordem de frase a quem nao decodifica os caracteres faz o aluno
+   * decorar o DESENHO da frase, nao le-la.
+   */
+  needsAlphabet: boolean;
 }
 
 export interface PlannedActivity {
@@ -56,6 +64,11 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   review: Pillar.LEARN,
   vocabulary: Pillar.LEARN,
   structure: Pillar.LEARN,
+  alphabet: Pillar.LEARN,
+  // Ver a mesma frase nos quatro idiomas e aula: o aluno recebe o contraste.
+  contrast: Pillar.LEARN,
+  // Produzir a mesma frase nos quatro de memoria e uso, nao apresentacao.
+  compare: Pillar.LIVE,
   // Producao livre e uso real da lingua, nao treino de forma.
   production: Pillar.LIVE,
   grammar: Pillar.LEARN,
@@ -90,6 +103,12 @@ const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   vocabulary: 'vocabScore',
   // Montar frase e gramatica aplicada: o dominio aparece ali.
   structure: 'grammar',
+  // Ligar caractere a som e leitura na sua forma mais basica.
+  alphabet: 'reading',
+  // Comparar a ordem das pecas entre os quatro idiomas move gramatica.
+  contrast: 'grammar',
+  // Produzir a mesma frase nos quatro de memoria e escrita, como a producao.
+  compare: 'writing',
   grammar: 'grammar',
   listening: 'listening',
   // Ditado depende de escuta, mas concorre em separado -- a penalidade de
@@ -125,9 +144,24 @@ export function pillarForType(type: string): Pillar {
  */
 const DAILY_TYPES = ['structure', 'vocabulary'] as const;
 
+/**
+ * O bloco obrigatorio que substitui `structure` enquanto o alfabeto do idioma
+ * nao esta fechado. Ocupa a MESMA vaga, em vez de somar uma terceira: o tempo
+ * do idioma nao cresceu, e a frase pode esperar -- a leitura, nao.
+ */
+const ALPHABET_TYPE = 'alphabet';
+
+/** Os blocos obrigatorios deste idioma hoje, na ordem. */
+export function dailyTypesFor(state: Pick<LanguageState, 'needsAlphabet'>): string[] {
+  return DAILY_TYPES.map((type) =>
+    type === 'structure' && state.needsAlphabet ? ALPHABET_TYPE : type,
+  );
+}
+
 /** Tipos que podem ser iniciados avulso, pelo botao de pratica livre. */
 export const PRACTICABLE_TYPES = [
   'review',
+  'alphabet',
   'structure',
   'vocabulary',
   'production',
@@ -148,6 +182,31 @@ export const PRACTICABLE_TYPES = [
  * caro do produto. Tambem e o unico que mede o que o resto so treina.
  */
 const PRODUCTION_MINUTES = 8;
+
+/**
+ * Os dois blocos que atravessam os idiomas e emolduram o dia.
+ *
+ * Eles sao a resposta a exigencia central do aluno: aprender no mesmo dia as
+ * MESMAS coisas nos quatro idiomas. O resto da sessao continua organizado por
+ * idioma, e e assim que deve ser -- a pesquisa e explicita: bloquear DENTRO de
+ * cada lingua, intercalar ENTRE elas, e so tornar o contraste explicito no fim.
+ *
+ * Dai a moldura, e nesta ordem:
+ *
+ * - `contrast` ABRE o dia. Os quatro idiomas lado a lado na can-do de hoje. Vem
+ *   antes porque e apresentacao guiada, nao teste: intercalar sem apoio no
+ *   comeco atrapalha quem ainda esta no inicio, em vez de ajudar.
+ * - `compare` FECHA o dia. Ele produz a mesma coisa nos quatro de memoria e so
+ *   depois revela. E o contraste explicito no fim, quando ja ha o que comparar.
+ *
+ * Nenhum dos dois concorre por vaga no ranqueamento: sao a promessa do produto,
+ * nao um preenchimento de tempo que sobrou.
+ */
+const CONTRAST_MINUTES = 5;
+const COMPARE_MINUTES = 4;
+
+/** Tipos que atravessam os idiomas e por isso ficam fora do ranqueamento. */
+const CROSS_LANGUAGE_TYPES = ['contrast', 'compare'] as const;
 
 export interface PlanOptions {
   /**
@@ -178,15 +237,55 @@ export function planSession(
       ? Math.min(PRODUCTION_MINUTES, Math.floor(totalMinutes * 0.2))
       : 0;
 
-  const budget = totalMinutes - production;
+  /*
+   * A moldura cross-language sai do total ANTES da divisao por idioma, pela
+   * mesma razao da producao: ela nao pertence a nenhum deles.
+   *
+   * So entra com pelo menos dois idiomas (sem dois nao ha contraste) e com
+   * tempo para sobrar pelo menos o dobro dela aos idiomas -- num dia de dez
+   * minutos a moldura comeria a sessao e o aluno ficaria comparando frases que
+   * nao estudou.
+   */
+  const frame =
+    languages.length >= 2 && totalMinutes - production >= (CONTRAST_MINUTES + COMPARE_MINUTES) * 3
+      ? CONTRAST_MINUTES + COMPARE_MINUTES
+      : 0;
+
+  const budget = totalMinutes - production - frame;
+
+  if (frame > 0) {
+    // Dono nominal: `languageCode` nao aceita nulo, e a convencao ja usada pela
+    // producao e apontar o idioma prioritario. O conteudo e dos quatro.
+    activities.push({
+      languageCode: languages[0].code,
+      pillar: PILLAR_BY_TYPE.contrast,
+      type: 'contrast',
+      plannedMinutes: CONTRAST_MINUTES,
+      reason: DAILY_REASON.contrast,
+    });
+  }
 
   // O tempo declarado por idioma e normalizado para bater com o total real.
   const declared = languages.reduce((sum, l) => sum + l.minutesPerDay, 0) || 1;
   const scale = budget / declared;
 
+  /*
+   * A distribuicao e acumulada, e nao um arredondamento por idioma.
+   *
+   * Arredondar cada idioma isoladamente erra o total por alguns minutos sempre
+   * que a escala nao e redonda -- e com a moldura e a producao saindo do bolo,
+   * ela quase nunca e. Distribuir pela diferenca entre acumulados soma
+   * exatamente o orcamento, que e o que a sessao promete ao aluno.
+   */
+  let consumed = 0;
+  let allocated = 0;
+
   for (const language of languages) {
-    const minutes = Math.round(language.minutesPerDay * scale);
+    consumed += language.minutesPerDay;
+    const upTo = Math.round(consumed * scale);
+    const minutes = upTo - allocated;
     if (minutes < MIN_BLOCK) continue;
+    allocated = upTo;
 
     const { blocks, highlight } = planLanguage(language, minutes);
     activities.push(...blocks);
@@ -202,6 +301,18 @@ export function planSession(
       type: 'production',
       plannedMinutes: production,
       reason: 'Dizer a mesma coisa nos quatro idiomas, sem alternativa na tela.',
+    });
+  }
+
+  if (frame > 0) {
+    // Depois de tudo, inclusive da producao: e o fechamento do dia, o momento
+    // em que o contraste entre os quatro vira explicito.
+    activities.push({
+      languageCode: languages[0].code,
+      pillar: PILLAR_BY_TYPE.compare,
+      type: 'compare',
+      plannedMinutes: COMPARE_MINUTES,
+      reason: DAILY_REASON.compare,
     });
   }
 
@@ -252,11 +363,13 @@ function planLanguage(
   }
 
   // 2. Os dois blocos do dia, sem passar pelo ranqueamento.
-  DAILY_TYPES.forEach((type, index) => {
+  const dailyTypes = dailyTypesFor(language);
+
+  dailyTypes.forEach((type, index) => {
     if (remaining < MIN_BLOCK) return;
 
     // O que os obrigatorios seguintes ainda vao precisar.
-    const stillReserved = MIN_BLOCK * (DAILY_TYPES.length - index - 1);
+    const stillReserved = MIN_BLOCK * (dailyTypes.length - index - 1);
     const blockMinutes = Math.min(
       MAX_BLOCK,
       Math.max(MIN_BLOCK, remaining - stillReserved),
@@ -274,7 +387,7 @@ function planLanguage(
   });
 
   // 3. O tempo restante vai para os tipos com maior necessidade.
-  const ranked = rankTypes(language);
+  const ranked = rankTypes(language, dailyTypes);
 
   for (const candidate of ranked) {
     if (remaining < MIN_BLOCK) break;
@@ -301,8 +414,13 @@ function planLanguage(
 }
 
 /** Por que cada bloco obrigatorio esta ali -- a sessao sempre se explica. */
-const DAILY_REASON: Record<(typeof DAILY_TYPES)[number], string> = {
+const DAILY_REASON: Record<string, string> = {
+  contrast:
+    'A mesma frase nos quatro idiomas, lado a lado. É aqui que você vê o que muda de um para o outro.',
+  compare:
+    'Diga a mesma coisa nos quatro, de memória, e só depois confira. O contraste fecha o dia.',
   structure: 'Como este idioma monta a frase. Saber a palavra nao basta para dizer a frase.',
+  alphabet: 'Ler as letras deste idioma. Sem isso, a palavra é só desenho.',
   vocabulary: 'Os conceitos de hoje, os mesmos que voce ve nos outros idiomas.',
 };
 
@@ -316,12 +434,30 @@ interface RankedType {
  * Pontua cada tipo de atividade. Score maior = mais necessario hoje.
  * Tres forcas: fraqueza da competencia, erros recorrentes e variedade.
  */
-function rankTypes(language: LanguageState): RankedType[] {
+function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] {
   // Os obrigatorios ja entraram: deixa-los concorrer de novo duplicaria o
   // bloco e ainda tiraria a vaga de uma competencia nao atendida hoje.
-  const candidates = Object.keys(SKILL_BY_TYPE).filter(
-    (type) => !DAILY_TYPES.includes(type as (typeof DAILY_TYPES)[number]),
-  );
+  //
+  // O alfabeto sai da disputa mesmo quando nao e obrigatorio hoje: ele e uma
+  // escada com uma licao por vez, entao um segundo bloco no mesmo dia repetiria
+  // a mesma licao -- e, com a trilha fechada, nao ha o que servir.
+  //
+  // `DAILY_TYPES` entra inteiro junto com os de hoje: em modo alfabeto,
+  // `structure` perdeu a vaga obrigatoria e voltaria pela porta do ranqueamento,
+  // devolvendo ao aluno exatamente a aula que ele ainda nao consegue ler.
+  //
+  // `contrast` e `compare` tambem ficam de fora, e por um motivo diferente:
+  // eles nao sao blocos DESTE idioma. Ja foram criados uma vez, fora da divisao
+  // por idioma, e deixa-los concorrer aqui daria um bloco de comparacao por
+  // idioma -- quatro vezes a mesma tela, cada uma dizendo pertencer a uma
+  // lingua so, que e o oposto do que eles fazem.
+  const excluded = new Set<string>([
+    ...DAILY_TYPES,
+    ...dailyTypes,
+    ALPHABET_TYPE,
+    ...CROSS_LANGUAGE_TYPES,
+  ]);
+  const candidates = Object.keys(SKILL_BY_TYPE).filter((type) => !excluded.has(type));
 
   const ranked = candidates.map<RankedType>((type) => {
     const skill = SKILL_BY_TYPE[type];

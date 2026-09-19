@@ -7,16 +7,15 @@ import { ErrorsService } from '../errors/errors.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { SESSION_COMPLETION_XP, xpForActivity } from '../gamification/xp.rules';
 import { ReviewService } from '../review/review.service';
+import { AlphabetService } from '../alphabet/alphabet.service';
 import {
+  dailyTypesFor,
   LanguageState,
   MissionPlan,
   pillarForType,
   planSession,
   PlannedActivity,
 } from './mission.engine';
-
-/** Blocos que todo idioma recebe todo dia -- espelha DAILY_TYPES do motor. */
-const MANDATORY_TYPES = ['structure', 'vocabulary'] as const;
 
 /**
  * De quantos em quantos dias volta a producao quadrupla.
@@ -38,6 +37,7 @@ export class StudyService {
     private readonly errors: ErrorsService,
     private readonly gamification: GamificationService,
     private readonly ai: AiRouterService,
+    private readonly alphabet: AlphabetService,
   ) {}
 
   /**
@@ -54,12 +54,8 @@ export class StudyService {
   }
 
   private async findTodaySession(userId: string) {
-    const start = startOfDay(new Date());
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-
     return this.prisma.studySession.findFirst({
-      where: { userId, date: { gte: start, lt: end } },
+      where: { userId, date: todayWindow() },
       include: { activities: { include: { language: true }, orderBy: { order: 'asc' } } },
     });
   }
@@ -108,6 +104,7 @@ export class StudyService {
           grammar: ul.grammar,
         },
         errorCounts: Object.fromEntries(errorRows.map((e) => [e.category, e.occurrences])),
+        needsAlphabet: await this.alphabet.needsAlphabet(userId, code),
         recentTypes: recentActivities
           .filter((a) => a.language.code === code)
           .slice(0, 6)
@@ -155,29 +152,63 @@ export class StudyService {
 
     const languageIds = await this.languageIdMap();
 
-    const session = await this.prisma.studySession.create({
-      data: {
-        userId,
-        plannedMinutes: totalMinutes,
-        plan: plan as unknown as object,
-        rationale: plan.rationale,
-        activities: {
-          create: plan.activities
-            .filter((a) => languageIds.has(a.languageCode))
-            .map((activity, index) => ({
-              languageId: languageIds.get(activity.languageCode)!,
-              pillar: activity.pillar,
-              type: activity.type,
-              order: index,
-              plannedMinutes: activity.plannedMinutes,
-              reason: activity.reason,
-            })),
-        },
-      },
-      include: { activities: { include: { language: true }, orderBy: { order: 'asc' } } },
-    });
+    /*
+     * A criacao e serializada por usuario.
+     *
+     * "Procura, e se nao achar cria" nao basta: o dashboard e a tela de sessao
+     * pedem o dia ao mesmo tempo, e duas chamadas simultaneas nao encontram
+     * nada, criam uma sessao cada e o aluno fica com dois planos diferentes
+     * para o mesmo dia. Reproduzido: cinco chamadas em paralelo geraram cinco
+     * sessoes em menos de um segundo.
+     *
+     * A trava so envolve a reconferencia e o insert. O caro -- montar o estado,
+     * planejar e o refinamento por IA -- fica de fora de proposito: segurar a
+     * trava durante uma chamada de IA prenderia a conexao por minutos.
+     *
+     * `pg_advisory_xact_lock` e liberado sozinho no fim da transacao, inclusive
+     * se ela falhar, entao nao ha trava orfa para limpar.
+     */
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
 
-    return session;
+        const concurrent = await tx.studySession.findFirst({
+          where: { userId, date: todayWindow() },
+          include: { activities: { include: { language: true }, orderBy: { order: 'asc' } } },
+        });
+        if (concurrent) return concurrent;
+
+        return tx.studySession.create({
+          data: {
+            userId,
+            plannedMinutes: totalMinutes,
+            plan: plan as unknown as object,
+            rationale: plan.rationale,
+            activities: {
+              create: plan.activities
+                .filter((a) => languageIds.has(a.languageCode))
+                .map((activity, index) => ({
+                  languageId: languageIds.get(activity.languageCode)!,
+                  pillar: activity.pillar,
+                  type: activity.type,
+                  order: index,
+                  plannedMinutes: activity.plannedMinutes,
+                  reason: activity.reason,
+                })),
+            },
+          },
+          include: { activities: { include: { language: true }, orderBy: { order: 'asc' } } },
+        });
+      },
+      /*
+       * Os 5s padrao do Prisma nao servem aqui: quem espera na trava segura a
+       * transacao aberta enquanto o primeiro monta o dia, e montar o dia sozinho
+       * ja custa perto de 5s (sao 13 atividades inseridas contra um Postgres
+       * remoto). A espera e limitada por essa criacao, nao por trabalho proprio
+       * -- assim que o primeiro termina, os outros so releem e devolvem.
+       */
+      { timeout: 20_000, maxWait: 15_000 },
+    );
   }
 
   private async refineWithAi(
@@ -220,14 +251,38 @@ export class StudyService {
        * cada um. A IA e refinamento, e refinamento nao tem licenca para
        * remover a promessa: um plano sem esses dois blocos em algum idioma cai
        * inteiro para o deterministico, que os garante por construcao.
+       *
+       * O idioma em modo alfabeto e cobrado pelo bloco que o substitui, e nao
+       * por `structure`: exigir a aula de frase de quem ainda nao le rejeitaria
+       * TODO plano refinado enquanto a trilha durasse.
        */
       const keepsDaily = languages.every((l) =>
-        MANDATORY_TYPES.every((type) =>
+        dailyTypesFor(l).every((type) =>
           valid.some((a) => a.languageCode === l.code && a.type === type),
         ),
       );
 
-      if (valid.length === 0 || !coversAll || !keepsDaily || Math.abs(planned - totalMinutes) > 10) {
+      /*
+       * A moldura cross-language e cobrada pela mesma regra, e nao por tipo
+       * fixo: so e exigida quando o plano deterministico tambem a criou.
+       *
+       * Ela depende do tamanho do dia e do numero de idiomas, entao exigi-la
+       * sempre rejeitaria todo plano refinado num dia curto -- justamente o dia
+       * em que o refinamento mais ajudaria. E quando ela cabe, ela nao e
+       * opcional: contraste e comparacao sao a exigencia central do aluno, e a
+       * IA nao tem licenca para remove-la.
+       */
+      const keepsFrame = fallback.activities
+        .filter((a) => a.type === 'contrast' || a.type === 'compare')
+        .every((a) => valid.some((v) => v.type === a.type));
+
+      if (
+        valid.length === 0 ||
+        !coversAll ||
+        !keepsDaily ||
+        !keepsFrame ||
+        Math.abs(planned - totalMinutes) > 10
+      ) {
         this.logger.warn('Plano da IA rejeitado pela validacao; usando o plano deterministico.');
         return fallback;
       }
@@ -465,6 +520,11 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // Producao quadrupla e escrita livre, so que em quatro frentes ao mesmo
   // tempo -- move a mesma competencia.
   production: 'writing',
+  // Os dois blocos cross-language movem a competencia do idioma que os
+  // hospeda nominalmente -- e o mesmo campo que o motor usa para ranquear, para
+  // o bloco nao melhorar uma nota que ninguem consulta no dia seguinte.
+  contrast: 'grammar',
+  compare: 'writing',
   speaking: 'speaking',
   tutor: 'speaking',
   vocabulary: 'vocabScore',
@@ -474,6 +534,9 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // consulta para decidir o dia seguinte.
   structure: 'grammar',
   grammar: 'grammar',
+  // Decodificar letra a som e leitura -- mesma competencia que o motor usa para
+  // ranquear o bloco.
+  alphabet: 'reading',
 };
 
 type SessionWithActivities = {
@@ -503,4 +566,12 @@ function startOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+/** A janela do dia de hoje, para achar a sessao ja planejada. */
+function todayWindow(): { gte: Date; lt: Date } {
+  const start = startOfDay(new Date());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { gte: start, lt: end };
 }

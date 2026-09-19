@@ -12,6 +12,7 @@ export type AiTask =
   | 'concept.extract'
   | 'production.evaluate'
   | 'structure.generate'
+  | 'cando.generate'
   | 'lesson.generate'
   | 'listening.generate'
   | 'dictation.generate'
@@ -42,6 +43,11 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // drills. Uma ordem de palavras errada aqui ensina a montar frase errada --
   // o erro mais caro do produto, porque o aluno o repete em tudo que fala.
   'structure.generate',
+  // A aula de can-do e a mais dificil que pedimos: a MESMA frase realizada nos
+  // quatro idiomas, cada uma fatiada pelas mesmas colunas. O modelo rapido
+  // entrega quatro frases sobre assuntos parecidos em vez da mesma frase -- e
+  // uma aula assim destroi justamente a comparacao que ela deveria ensinar.
+  'cando.generate',
   // Traduzir um conceito e curto, mas erra de um jeito que estraga: uma palavra
   // pouco natural em russo vira card e o aluno decora o que ninguem diz.
   'concept.translate',

@@ -183,6 +183,18 @@ Regras:
   "vocabulary" hoje. Sao os dois blocos que sustentam a promessa do produto -- o mesmo
   conceito aprendido nos quatro idiomas, e a regra de montagem da frase de cada um.
   Um plano sem esses dois blocos em algum idioma sera descartado.
+- Se o idioma vier com "needsAlphabet": true, troque o bloco "structure" dele por um bloco
+  "alphabet" (pillar LEARN). O aluno ainda nao le os caracteres daquele idioma, e uma aula
+  de formacao de frase que ele nao consegue ler nao ensina nada. Nesse caso e o bloco
+  "alphabet" que e obrigatorio, e o plano sem ele sera descartado.
+- OBRIGATORIO tambem, quando houver dois ou mais idiomas e o dia comportar: a sessao ABRE
+  com um bloco "contrast" (pillar LEARN, 5 minutos) e FECHA com um bloco "compare" (pillar
+  LIVE, 4 minutos). Os dois atravessam os idiomas -- sao a mesma frase nos quatro -- e
+  aparecem UMA vez cada na sessao inteira, nunca um por idioma. Ponha no "languageCode"
+  deles o idioma prioritario, so porque todo bloco precisa de um dono.
+  A ordem nao e detalhe: o contraste guiado vem antes porque intercalar os idiomas sem
+  apoio no comeco atrapalha, e a comparacao de memoria vem no fim, quando ja ha o que
+  comparar. Um plano que remova esses dois blocos sera descartado.
 - Priorize as fraquezas: as subcompetencias com nota mais baixa e os erros recorrentes.
 - Varie em relacao as atividades recentes -- a sessao de hoje nao deve ser igual a de ontem.
 
@@ -193,7 +205,7 @@ Responda APENAS com JSON valido:
     {
       "languageCode": "en|es|de|ru",
       "pillar": "LISTEN|LEARN|LIVE|LEVEL_UP",
-      "type": "review|structure|vocabulary|grammar|listening|reading|speaking|writing|tutor",
+      "type": "contrast|review|alphabet|structure|vocabulary|grammar|listening|reading|speaking|writing|tutor|compare",
       "plannedMinutes": 5,
       "reason": "por que esta atividade foi escolhida, em portugues"
     }
@@ -750,6 +762,128 @@ Responda APENAS com JSON valido:
   "insight": "o que a comparacao entre os quatro revela, em portugues"
 }
 Cada "score" vai de 0 a 100.`;
+}
+
+// ---------------------------------------------------------------------------
+// Can-do: a mesma funcao comunicativa nos quatro idiomas
+// ---------------------------------------------------------------------------
+
+/** Um idioma da aula, com o nivel do aluno NAQUELE idioma e o que ele exige aqui. */
+export interface CanDoLessonTarget {
+  code: string;
+  name: string;
+  level: string;
+  /** O que este idioma exige nesta funcao e o portugues nao exige. */
+  note: string;
+  /** O erro que um falante de portugues comete neste ponto, se houver. */
+  trap?: string;
+}
+
+export interface CanDoLessonContext {
+  /** A funcao, em portugues, do ponto de vista de quem quer falar. */
+  question: string;
+  goal: string;
+  /** As colunas da tabela de montagem. Sao as MESMAS nos quatro idiomas. */
+  columns: string[];
+  targets: CanDoLessonTarget[];
+}
+
+/**
+ * A aula de can-do: a MESMA frase realizada nos quatro idiomas.
+ *
+ * Este prompt existe porque o bloco de estrutura falhava na promessa central do
+ * produto. Ele pedia a aula de UM idioma por vez, e o assunto vinha do catalogo
+ * daquele idioma -- entao no mesmo dia o aluno recebia a segunda posicao do
+ * verbo alemao, o "gustar" espanhol e mais duas regras sem nenhuma relacao. Nao
+ * havia nada para comparar, que e exatamente o que ele pediu.
+ *
+ * Aqui a unidade e a funcao comunicativa, e as quatro realizacoes saem numa
+ * chamada so. Isso nao e economia de token: e a unica forma de garantir que as
+ * quatro frases digam A MESMA COISA. Quatro chamadas independentes devolveriam
+ * quatro frases boas sobre quatro assuntos parecidos, e a comparacao morreria.
+ *
+ * As pecas vem rotuladas pelas COLUNAS da can-do, iguais nos quatro idiomas: e
+ * ver a mesma coluna preenchida em posicoes diferentes que ensina a regra de
+ * ordem sem precisar enuncia-la. Coluna sem contraparte no idioma fica de fora
+ * -- celula vazia e honesta; inventar peca para preencher a tabela e mentira.
+ */
+export function canDoLessonPrompt(ctx: CanDoLessonContext, sentences: number): string {
+  const languages = ctx.targets
+    .map(
+      (t) =>
+        `--- ${LANGUAGE_LABEL[t.code] ?? t.name} (${t.code}), nivel do aluno: ${t.level}\n` +
+        `    O que este idioma exige aqui: ${t.note}` +
+        (t.trap ? `\n    Armadilha para o brasileiro: ${t.trap}` : ''),
+    )
+    .join('\n');
+
+  const codes = ctx.targets.map((t) => t.code).join('", "');
+
+  return `Voce escreve a aula de um brasileiro que estuda ingles, espanhol, alemao e russo AO
+MESMO TEMPO. Ele fala portugues nativo.
+
+A exigencia central dele: no mesmo dia, aprender A MESMA COISA nos quatro idiomas, para
+saber exatamente como fazer aquilo em cada um. A unidade da aula nao e uma regra de
+gramatica de um idioma -- e uma FUNCAO comunicativa, dita em portugues.
+
+FUNCAO DE HOJE: ${ctx.question}
+O QUE ELE SAI SABENDO FAZER: ${ctx.goal}
+
+COLUNAS DA TABELA DE MONTAGEM (as mesmas nos quatro idiomas): ${ctx.columns.join(' | ')}
+
+OS QUATRO IDIOMAS (fatos estabelecidos, NAO contradiga):
+${languages}
+
+Escreva ${sentences} frases-modelo. Cada frase e UMA ideia, realizada nos ${ctx.targets.length} idiomas.
+
+A REGRA QUE MANDA EM TODAS AS OUTRAS: as realizacoes de uma mesma frase tem de dizer
+EXATAMENTE A MESMA COISA nos ${ctx.targets.length} idiomas. Mesma pessoa, mesma coisa, mesmo lugar, mesmo
+tempo verbal, mesmo registro. Se as frases falarem de coisas diferentes, a aula inteira
+perde o sentido: o aluno so aprende a diferenca entre as linguas comparando lado a lado
+a MESMA mensagem. Antes de escrever, decida a ideia em portugues ("gloss") e so depois
+realize-a em cada idioma.
+
+Regras:
+- Traduza o SENTIDO, nunca palavra por palavra. Se um idioma resolve a funcao com outra
+  construcao (sem verbo, com caso, com a frase invertida), use a construcao que um nativo
+  usaria de verdade -- e justamente essa diferenca que a aula mostra.
+- O NIVEL E POR IDIOMA, declarado acima. A frase russa de A1 e curta mesmo quando a
+  inglesa do mesmo sentido poderia ser mais sofisticada. O sentido e o mesmo; o registro,
+  nao. Nunca simplifique o SENTIDO para caber no nivel: escolha uma ideia que caiba nos
+  quatro.
+- Cada realizacao vem DESMONTADA em "parts": cada peca com o texto exato e a COLUNA a que
+  ela pertence, escolhida entre ${ctx.columns.map((c) => `"${c}"`).join(', ')}. Juntar as parts na
+  ordem, separadas por espaco, tem de devolver a frase inteira, sem sobrar nem faltar nada.
+- A ORDEM das parts e a ordem real daquele idioma. E o unico jeito de a tabela ensinar:
+  a mesma coluna aparece em posicoes diferentes, e o aluno ve a regra em vez de le-la.
+- Se uma coluna nao tiver contraparte no idioma (o russo sem verbo "ser", por exemplo),
+  simplesmente nao gere a peca daquela coluna. Nunca invente palavra para preencher.
+- Em russo escreva em cirilico e ponha a transliteracao em "romanization".
+- "note" e uma linha em portugues sobre o que ESTA frase mostra naquele idioma.
+- "contrast" e um paragrafo curto em portugues (3 a 5 frases) comparando os ${ctx.targets.length} idiomas
+  nesta funcao: o que muda de ordem, o que um exige e outro nao, e onde o espanhol trai o
+  brasileiro por ser parecido demais. Fale das quatro linguas, nao de uma.
+- Nenhuma frase pode repetir a ideia de outra.
+
+Responda APENAS com JSON valido, sem nenhum texto fora dele:
+{
+  "sentences": [
+    {
+      "gloss": "a ideia da frase, em portugues",
+      "realizations": [
+        {
+          "languageCode": "${ctx.targets[0]?.code ?? 'en'}",
+          "sentence": "a frase completa neste idioma",
+          "romanization": "so em russo; null nos outros",
+          "parts": [{ "text": "peca da frase", "column": "${ctx.columns[0] ?? 'QUEM'}" }],
+          "note": "o que esta frase mostra neste idioma, em uma linha"
+        }
+      ]
+    }
+  ],
+  "contrast": "o paragrafo em portugues comparando os ${ctx.targets.length} idiomas"
+}
+Cada frase precisa das ${ctx.targets.length} realizacoes: "${codes}". Nenhuma pode faltar.`;
 }
 
 // ---------------------------------------------------------------------------

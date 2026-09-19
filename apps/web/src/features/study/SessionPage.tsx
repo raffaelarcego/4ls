@@ -79,8 +79,7 @@ export function SessionPage() {
     return (
       <Shell>
         <div className="mx-auto max-w-md space-y-3 pt-20 text-center">
-          <span className="inline-block animate-float text-5xl">🦉</span>
-          <p className="font-extrabold text-wolf">Montando sua sessão...</p>
+          <p className="font-serif text-lg font-semibold text-eel">Montando sua sessão...</p>
         </div>
       </Shell>
     );
@@ -90,18 +89,17 @@ export function SessionPage() {
     return (
       <Shell>
         <div className="mx-auto max-w-md space-y-5 pt-12 text-center">
-          <span className="inline-block animate-pop text-7xl">🏆</span>
           <div>
-            <h1 className="text-3xl font-black">Sessão concluída!</h1>
-            <p className="font-semibold text-wolf">Sua ofensiva de hoje está garantida.</p>
+            <h1 className="font-serif text-2xl font-semibold text-eel">Sessão concluída</h1>
+            <p className="text-sm text-wolf">O dia de hoje entrou na sua sequência.</p>
           </div>
 
           <div className="mx-auto flex max-w-xs justify-center gap-3">
-            <Trophy label="XP ganho" value={`+${finished.xp}`} tone="border-bee text-bee-dark" />
+            <Trophy label="XP ganho" value={`+${finished.xp}`} tone="border-bee" />
             <Trophy
               label="Conquistas"
               value={`${finished.achievements.length}`}
-              tone="border-humpback text-humpback-dark"
+              tone="border-humpback"
             />
           </div>
 
@@ -110,8 +108,8 @@ export function SessionPage() {
               <p className="section-title mb-1.5">Novas conquistas</p>
               <ul className="space-y-1">
                 {finished.achievements.map((name) => (
-                  <li key={name} className="font-extrabold text-humpback-dark">
-                    🏅 {name}
+                  <li key={name} className="text-sm text-humpback-dark">
+                    {name}
                   </li>
                 ))}
               </ul>
@@ -134,10 +132,11 @@ export function SessionPage() {
     return (
       <Shell>
         <div className="mx-auto max-w-md space-y-5 pt-12 text-center">
-          <span className="inline-block animate-float text-7xl">🎯</span>
           <div>
-            <h1 className="text-2xl font-black">Todos os blocos foram feitos</h1>
-            <p className="font-semibold text-wolf">
+            <h1 className="font-serif text-2xl font-semibold text-eel">
+              Todos os blocos foram feitos
+            </h1>
+            <p className="text-sm text-wolf">
               Feche a sessão para registrar o streak e receber o bônus de conclusão.
             </p>
           </div>
@@ -162,6 +161,15 @@ export function SessionPage() {
 
   const theme = activityTheme(current.type);
   const language = languageTheme(current.languageCode);
+
+  /*
+   * Blocos que atravessam os idiomas pertencem, no banco, a um idioma so --
+   * `Activity.languageId` nao aceita nulo, entao contraste, comparacao e
+   * producao ficam registrados sob o idioma prioritario. Isso e convencao de
+   * armazenamento, nao conteudo: anunciar "Contraste, English" num bloco que
+   * mostra os quatro lado a lado diz ao aluno exatamente a coisa errada.
+   */
+  const crossLanguage = CROSS_LANGUAGE_TYPES.has(current.type);
   const overtime = elapsed > current.plannedMinutes * 60;
 
   return (
@@ -177,7 +185,7 @@ export function SessionPage() {
           </button>
           <ProgressBar value={done} max={total} size="lg" />
           <span
-            className={`shrink-0 text-sm font-black tabular-nums ${
+            className={`shrink-0 font-mono text-sm tabular-nums ${
               overtime ? 'text-beak' : 'text-hare'
             }`}
           >
@@ -189,13 +197,16 @@ export function SessionPage() {
       <div className="lesson-pad space-y-5">
         <div className="flex items-center gap-3">
           <span
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md border font-mono text-lg ${language.soft} ${language.border} ${language.text}`}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md border font-mono text-lg ${
+              crossLanguage ? 'border-swan bg-snow text-wolf' : `${language.soft} ${language.border} ${language.text}`
+            }`}
           >
-            {language.mark}
+            {crossLanguage ? '4' : language.mark}
           </span>
           <div className="min-w-0">
             <h1 className="truncate font-serif text-lg font-semibold text-eel">
-              {theme.label}, {current.languageName}
+              {theme.label}
+              {crossLanguage ? ', os quatro idiomas' : `, ${current.languageName}`}
             </h1>
             <p className="font-mono text-xs text-hare">
               bloco {session.activities.findIndex((a) => a.id === current.id) + 1} de {total},{' '}
@@ -227,6 +238,9 @@ export function SessionPage() {
     </Shell>
   );
 }
+
+/** Tipos cujo conteudo vale para os quatro idiomas, nao para o dono nominal. */
+const CROSS_LANGUAGE_TYPES = new Set(['contrast', 'compare', 'production']);
 
 /** Sessao roda em tela cheia, sem a navegacao do app: um bloco por vez. */
 function Shell({ header, children }: { header?: React.ReactNode; children: React.ReactNode }) {

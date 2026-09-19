@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { sentencePatternPrompt, SentencePatternContext } from '../../infrastructure/ai/prompts';
 import { AiRouterService } from '../../infrastructure/ai/ai-router.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -89,8 +94,13 @@ export class StructureService {
    * O padrao escolhido e o menos dominado entre os que cabem no nivel do
    * aluno. Nao e rotacao cega: se a ordem do verbo alemao ainda nao firmou,
    * ela volta -- e o ponto que trava todas as frases daquele idioma.
+   *
+   * Este caminho NUNCA gera conteudo: so le o que ja esta pronto. Gerar uma
+   * aula custa cerca de dois minutos (medido: 116s em russo) e a funcao na
+   * Vercel morre aos 60s -- o aluno recebia "network error" no meio do estudo.
+   * Quem gera e `warm()`, fora do horario de estudo. Ver `warm-content.ts`.
    */
-  async lesson(userId: string, languageCode: string, fresh = false) {
+  async lesson(userId: string, languageCode: string) {
     const userLanguage = await this.prisma.userLanguage.findFirst({
       where: { userId, language: { code: languageCode } },
       include: { language: true },
@@ -107,7 +117,7 @@ export class StructureService {
     }
 
     const pattern = await this.pickPattern(userId, languageCode, candidates);
-    const content = await this.content(userId, pattern, userLanguage.currentLevel, fresh);
+    const content = await this.fromPool(pattern, userLanguage.currentLevel);
 
     const progress = await this.prisma.grammarProgress.findUnique({
       where: {
@@ -166,45 +176,82 @@ export class StructureService {
     return ranked[0];
   }
 
-  /** Conteudo da aula: do pool quando ele ja encheu, da IA enquanto nao. */
-  private async content(userId: string, pattern: SentencePattern, level: string, fresh: boolean) {
+  /**
+   * A aula pronta, do pool.
+   *
+   * Basta UMA no pool para servir; antes so reaproveitava com o pool cheio
+   * (tres) e gerava nas duas primeiras vezes -- ou seja, justamente quando o
+   * aluno estava esperando. Encher ate `POOL_TARGET` continua valendo, mas e
+   * trabalho do `warm()`, que roda fora do estudo.
+   */
+  private async fromPool(pattern: SentencePattern, level: string) {
     const where = { languageCode: pattern.languageCode, level, patternId: pattern.id };
 
-    if (!fresh) {
-      const pool = await this.prisma.sentencePattern.count({ where });
-      if (pool >= POOL_TARGET) {
-        const reused = await this.prisma.sentencePattern.findFirst({
-          where,
-          orderBy: [{ timesUsed: 'asc' }, { lastUsedAt: 'asc' }],
-        });
-        if (reused) {
-          await this.prisma.sentencePattern
-            .update({
-              where: { id: reused.id },
-              data: { timesUsed: { increment: 1 }, lastUsedAt: new Date() },
-            })
-            .catch(() => undefined);
-          return serialize(reused);
-        }
-      }
+    const reused = await this.prisma.sentencePattern.findFirst({
+      where,
+      orderBy: [{ timesUsed: 'asc' }, { lastUsedAt: 'asc' }],
+    });
+
+    if (!reused) {
+      throw new ServiceUnavailableException(
+        `A aula de estrutura de ${pattern.languageCode} ainda não foi preparada. ` +
+          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
+      );
     }
 
-    const generated = await this.generate(userId, pattern, level);
-    const stored = await this.prisma.sentencePattern.create({
-      data: {
-        ...where,
-        title: generated.title,
-        question: pattern.question,
-        formula: generated.formula,
-        explanation: generated.explanation,
-        steps: generated.steps as unknown as object,
-        examples: generated.examples as unknown as object,
-        pitfalls: generated.pitfalls as unknown as object,
-        drills: generated.drills as unknown as object,
-      },
+    await this.prisma.sentencePattern
+      .update({
+        where: { id: reused.id },
+        data: { timesUsed: { increment: 1 }, lastUsedAt: new Date() },
+      })
+      .catch(() => undefined);
+
+    return serialize(reused);
+  }
+
+  /**
+   * Enche o pool do proximo padrao de que o aluno vai precisar neste idioma.
+   *
+   * Roda fora do horario de estudo (script/cron), onde dois minutos por aula
+   * nao incomodam ninguem. Gera so o que falta: e idempotente e barato quando
+   * o pool ja esta cheio.
+   */
+  async warm(userId: string, languageCode: string, target = POOL_TARGET): Promise<number> {
+    const userLanguage = await this.prisma.userLanguage.findFirst({
+      where: { userId, language: { code: languageCode } },
     });
-    this.logger.log(`Nova aula de estrutura ${pattern.id}/${level} (${stored.id}).`);
-    return serialize(stored);
+    if (!userLanguage) return 0;
+
+    const level = userLanguage.currentLevel;
+    const candidates = patternsFor(languageCode, level);
+    if (candidates.length === 0) return 0;
+
+    const pattern = await this.pickPattern(userId, languageCode, candidates);
+    const where = { languageCode, level, patternId: pattern.id };
+
+    const existing = await this.prisma.sentencePattern.count({ where });
+    let created = 0;
+
+    for (let i = existing; i < target; i += 1) {
+      const generated = await this.generate(userId, pattern, level);
+      await this.prisma.sentencePattern.create({
+        data: {
+          ...where,
+          title: generated.title,
+          question: pattern.question,
+          formula: generated.formula,
+          explanation: generated.explanation,
+          steps: generated.steps as unknown as object,
+          examples: generated.examples as unknown as object,
+          pitfalls: generated.pitfalls as unknown as object,
+          drills: generated.drills as unknown as object,
+        },
+      });
+      created += 1;
+      this.logger.log(`Aula de estrutura preparada: ${pattern.id}/${level} (${created}/${target}).`);
+    }
+
+    return created;
   }
 
   private async generate(

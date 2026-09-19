@@ -630,3 +630,52 @@ model SentencePattern {
   @@index([languageCode, patternId])
   @@map("sentence_patterns")
 }
+
+// ============================ Can-do (4 idiomas) ============================
+
+/**
+ * A aula de uma can-do: a MESMA frase realizada nos quatro idiomas.
+ * `SentencePattern` nao serve para isto e nao da para adaptar: ela e chaveada
+ * por (idioma, nivel, padrao) e guarda a aula de UM idioma. Uma aula de can-do
+ * nao pertence a idioma nenhum -- ela existe justamente no espaco entre os
+ * quatro, e quebra-la em quatro linhas perderia o unico dado que importa: que
+ * aquelas frases sao a mesma frase.
+ * Gerada fora do horario de estudo, como todo pool -- esta e a geracao mais
+ * cara do produto (quatro idiomas numa resposta so, com cirilico dentro).
+ */
+model CanDoLesson {
+  id        String @id @default(uuid())
+  /**
+   * Id da can-do no catalogo do codigo, ex.: "dizer-onde-algo-esta".
+   */
+  canDoId   String
+  /**
+   * O nivel-teto da aula: o MENOR nivel entre os idiomas do aluno, porque a
+   * can-do precisa ser ensinavel nos quatro ao mesmo tempo.
+   */
+  level     String
+  /**
+   * A pergunta da can-do, em portugues, como o aluno a formularia.
+   */
+  question  String
+  /**
+   * As colunas da tabela de montagem. As mesmas nos quatro idiomas.
+   */
+  columns   Json
+  /**
+   * As frases-modelo, cada uma com as suas realizacoes por idioma, ja
+   * fatiadas nas colunas.
+   */
+  sentences Json
+  /**
+   * O paragrafo em portugues que compara os quatro idiomas nesta funcao.
+   */
+  contrast  String
+
+  timesUsed  Int      @default(0)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([canDoId, level])
+  @@map("can_do_lessons")
+}

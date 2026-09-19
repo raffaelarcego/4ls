@@ -3,8 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import { AiModule } from './infrastructure/ai/ai.module';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SpeechModule } from './infrastructure/speech/speech.module';
+import { AlphabetModule } from './modules/alphabet/alphabet.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CanDoModule } from './modules/cando/can-do.module';
 import { ConceptsModule } from './modules/concepts/concepts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ErrorsModule } from './modules/errors/errors.module';
@@ -30,7 +32,9 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     LanguagesModule,
     VocabularyModule,
     ConceptsModule,
+    AlphabetModule,
     StructureModule,
+    CanDoModule,
     ReviewModule,
     ErrorsModule,
     GamificationModule,
