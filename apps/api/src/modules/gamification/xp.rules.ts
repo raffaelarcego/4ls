@@ -29,6 +29,9 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   lesson: 15,
   writing: 20,
   speaking: 25,
+  // Falar em voz alta imitando o ritmo custa quase o mesmo que a fala livre, e
+  // e o bloco que mais gente pula por vergonha -- o XP reconhece ter encarado.
+  shadowing: 20,
   // O bloco mais duro do produto: escrever a mesma frase em quatro idiomas,
   // sem nenhuma alternativa na tela. O XP reconhece isso.
   production: 40,

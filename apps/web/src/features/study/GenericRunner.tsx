@@ -19,6 +19,7 @@ import { MorphologyRunner } from './MorphologyRunner';
 import { ProductionRunner } from './ProductionRunner';
 import { PromotionRunner } from './PromotionRunner';
 import { ReadingRunner } from './ReadingRunner';
+import { ShadowingRunner } from './ShadowingRunner';
 import { SpeakingRunner } from './SpeakingRunner';
 import { StructureRunner } from './StructureRunner';
 import { TrapsRunner } from './TrapsRunner';
@@ -123,6 +124,11 @@ export function GenericRunner({
   }
   if (activity.type === 'dictation') {
     return <DictationRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Shadowing e o degrau antes da fala livre: repetir uma frase pronta treina
+  // ritmo, que e o que o Speaking Lab pressupoe e nao ensina.
+  if (activity.type === 'shadowing') {
+    return <ShadowingRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'speaking') {
     return <SpeakingRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;

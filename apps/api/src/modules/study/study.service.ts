@@ -543,6 +543,8 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   contrast: 'grammar',
   compare: 'writing',
   speaking: 'speaking',
+  // Repetir a frase inteira no ritmo certo e fala, como o Speaking Lab.
+  shadowing: 'speaking',
   tutor: 'speaking',
   vocabulary: 'vocabScore',
   review: 'vocabScore',

@@ -241,6 +241,19 @@ Por isso a validação mais severa do módulo é o alinhamento (`alignedPassage`
 
 A escolha do texto do dia inverte a regra dos outros blocos: em vez do assunto menos dominado, vem a história que ele **já leu em outro idioma e ainda não leu neste** — é a segunda leitura que dá o andaime. As perguntas de compreensão são por idioma e de **detalhe**, nunca de ideia geral: na terceira leitura ele já sabe a história e acertaria de memória, sem ler uma linha.
 
+**Shadowing** (`apps/api/src/modules/shadowing/`)
+O Speaking Lab mede **produção**: dá uma missão, você fala o que quiser, a IA avalia. O que não havia era treino de **ritmo e encadeamento** — pegar uma frase pronta, dita por voz nativa, e devolvê-la inteira. É o exercício mais antigo que existe para soltar a língua, e o único que ataca a distância entre "eu sei a frase" e "eu consigo dizer a frase".
+
+Duas coisas o tornam barato de um jeito que nenhum outro bloco é: **as frases já existem** (saem das can-dos, dos textos e das aulas de estrutura que você já estudou, então o áudio quase sempre já está no cache de voz), e **a correção é determinística** — comparar sua fala com uma frase *conhecida* é alinhamento de texto, não julgamento. O Speaking Lab precisa de IA porque a frase é livre; aqui o gabarito é a frase.
+
+O alinhamento é por subsequência comum mais longa, e não posição a posição como o ditado. A diferença não é sutil: no ditado você **digita**, então a palavra 3 corresponde mesmo à palavra 3. Aqui, se você engolir um artigo ou o reconhecedor ouvir uma palavra a mais, a comparação posicional desalinha tudo dali para a frente e uma repetição quase perfeita vira 20% — pior, a tela marcaria em vermelho palavras que você falou certo. Com alinhamento, uma palavra engolida custa uma palavra.
+
+Três decisões que valem registrar:
+
+- **A frase fica escondida até você tentar.** Com o texto na tela o exercício vira ler em voz alta, e o ritmo deixa de ser imitado. Só a tradução em português aparece antes, para você repetir sabendo o que diz.
+- **Palavra sobrando não desconta.** Descontar puniria duas vezes o mesmo tropeço e ainda puniria você pelo ruído do reconhecedor. Ela aparece na tela porque diz outra coisa: quando são muitas, quase sempre é o microfone ou o idioma do reconhecimento.
+- **Sem reconhecimento de fala o bloco continua existindo**, com autoavaliação. Esconder o exercício inteiro de quem está num navegador sem ASR seria perder o exercício por causa da nota.
+
 **Armadilhas cruzadas** (`apps/api/src/modules/traps/`)
 O Error Intelligence já sabia qual idioma estava contaminando qual, e o painel de interferência já dizia o que estudar. Só que ele parava no diagnóstico: mandava para uma **aula** sobre o ponto, e aula sobre interferência não desfaz interferência. O que desfaz é escolher a forma certa com a importada do lado, muitas vezes, até a primeira que vem à cabeça deixar de ser a errada.
 
@@ -325,6 +338,7 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
 - **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
 - **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Shadowing** — o app fala, você repete na hora, e a correção é palavra a palavra contra a frase original; sem IA, porque o gabarito é a própria frase
 - **Armadilhas cruzadas** — pares mínimos entre idiomas, em que a alternativa errada é a frase que sai quando outra língua vaza; a maior parte vem dos seus próprios erros, e acertar várias vezes **fecha** o erro
 - **Drill de casos** — em alemão e russo, a tabela viva de uma palavra que você já conhece, e a frase com a forma escondida; os distratores são as outras formas da mesma palavra
 - **Chefe de fase** — o exame que sobe o idioma de nível: abre quando o desempenho chega lá, cobra três rodadas com gabarito e, se você passar, todo o conteúdo daquele idioma sobe junto
@@ -380,6 +394,8 @@ GET  /api/concepts/coverage              quantos já existem nos 4 idiomas
 POST /api/concepts/learn                 aprende um termo — entra nos 4 de uma vez
 GET  /api/structure/lesson               a aula de formação de frase do dia
 POST /api/structure/record               resultado da rodada de montagem
+GET  /api/shadowing/lesson               frases já estudadas, para repetir em voz alta
+POST /api/shadowing/attempt              compara a fala com a frase, palavra a palavra
 GET  /api/traps/lesson                   armadilhas de hoje: os erros dele + catálogo
 POST /api/traps/record                   resultado — acertar várias vezes fecha o erro
 GET  /api/morphology/lesson              a tabela de casos do dia (de e ru)

@@ -99,6 +99,9 @@ const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   dictation: { label: 'Ditado', blurb: 'Ouvir e escrever' },
   reading: { label: 'Leitura', blurb: 'A mesma história nos 4 idiomas' },
   speaking: { label: 'Fala', blurb: 'Falar e ser corrigido' },
+  // Repetir uma frase pronta por cima da voz nativa: treina ritmo, que é o que
+  // a fala livre não treina.
+  shadowing: { label: 'Shadowing', blurb: 'Ouvir e repetir na hora' },
   writing: { label: 'Escrita', blurb: 'Produzir texto seu' },
   tutor: { label: 'Tutor', blurb: 'Conversa corrigida' },
   assessment: { label: 'Avaliação', blurb: 'Medir o nível' },

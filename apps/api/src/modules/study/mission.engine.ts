@@ -108,6 +108,8 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   dictation: Pillar.LISTEN,
   reading: Pillar.LISTEN,
   speaking: Pillar.LIVE,
+  // Repetir em voz alta uma frase pronta e uso da lingua, como falar.
+  shadowing: Pillar.LIVE,
   writing: Pillar.LIVE,
   tutor: Pillar.LIVE,
   assessment: Pillar.LEVEL_UP,
@@ -176,6 +178,9 @@ const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   dictation: 'listening',
   reading: 'reading',
   speaking: 'speaking',
+  // Shadowing move fala, mas concorre em separado -- a penalidade de repeticao
+  // e o que faz um alternar com o outro entre as sessoes, como escuta e ditado.
+  shadowing: 'speaking',
   writing: 'writing',
   tutor: 'speaking',
 };
@@ -254,6 +259,7 @@ export const PRACTICABLE_TYPES = [
   'listening',
   'dictation',
   'speaking',
+  'shadowing',
   'writing',
   'reading',
   'tutor',

@@ -165,6 +165,36 @@ export interface StructureLesson {
   attempts: number;
 }
 
+/** Uma frase para repetir em voz alta, vinda do que ele já estudou. */
+export interface ShadowingSentence {
+  text: string;
+  translation: string;
+  romanization?: string | null;
+  source: 'cando' | 'reading' | 'structure';
+}
+
+export interface ShadowingLesson {
+  languageCode: string;
+  languageName: string;
+  level: string;
+  sentences: ShadowingSentence[];
+}
+
+/**
+ * O resultado de uma repetição.
+ *
+ * `words` vem alinhado por subsequência comum, não posição a posição: uma
+ * palavra engolida custa uma palavra, não a frase inteira.
+ */
+export interface ShadowingScore {
+  score: number;
+  matched: number;
+  total: number;
+  /** O que o reconhecedor ouviu e não está na frase. Não desconta nota. */
+  extra: string[];
+  words: Array<{ expected: string; ok: boolean }>;
+}
+
 /**
  * Uma armadilha: a forma certa e a que sai quando outra língua vaza.
  *

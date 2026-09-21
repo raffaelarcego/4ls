@@ -21,6 +21,7 @@ import { PromotionModule } from './modules/promotion/promotion.module';
 import { ReadingModule } from './modules/reading/reading.module';
 import { ReferenceModule } from './modules/reference/reference.module';
 import { ReviewModule } from './modules/review/review.module';
+import { ShadowingModule } from './modules/shadowing/shadowing.module';
 import { SpeechFeatureModule } from './modules/speech/speech.module';
 import { StructureModule } from './modules/structure/structure.module';
 import { StudyModule } from './modules/study/study.module';
@@ -55,6 +56,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     StudyModule,
     TrapsModule,
     TutorModule,
+    ShadowingModule,
     SpeechFeatureModule,
     DashboardModule,
     AnalyticsModule,

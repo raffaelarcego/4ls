@@ -21,6 +21,7 @@ const TYPES = [
   'listening',
   'dictation',
   'speaking',
+  'shadowing',
   'writing',
   'reading',
   'tutor',

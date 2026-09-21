@@ -25,6 +25,7 @@ const XP_BY_TYPE: Record<string, number> = {
   dictation: 15,
   writing: 20,
   speaking: 25,
+  shadowing: 20,
   production: 40,
   tutor: 50,
   promotion: 60,
