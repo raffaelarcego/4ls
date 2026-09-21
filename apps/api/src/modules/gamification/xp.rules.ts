@@ -22,6 +22,8 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   // Produzir a terminacao certa e mais duro que reconhecer a regra, e e o bloco
   // que o aluno mais quer pular -- o XP acompanha o esforco real.
   morphology: 20,
+  // Curto, mas e o bloco que fecha erros abertos -- vale como gramatica.
+  traps: 15,
   // Ditado exige ouvir e escrever: pesa mais que escuta pura (10).
   dictation: 15,
   lesson: 15,

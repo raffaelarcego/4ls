@@ -1,4 +1,5 @@
-﻿import { useQuery } from '@tanstack/react-query';
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { languageTheme } from '../../lib/ui';
 import { api } from '../../services/api';
 import { Interference } from '../../types';
@@ -29,10 +30,32 @@ const CATEGORY_LABEL: Record<string, string> = {
  * para nada.
  */
 export function InterferencePanel({ onOpenTopic }: { onOpenTopic: (topicId: string) => void }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
   const { data } = useQuery<Interference[]>({
     queryKey: ['errors', 'interference'],
     queryFn: async () => (await api.get('/errors/interference')).data,
     retry: false,
+  });
+
+  /*
+   * O painel diagnosticava e parava ali: mandava estudar o contraste, que e uma
+   * AULA sobre a interferencia. Aula sobre interferencia nao desfaz
+   * interferencia -- o que desfaz e escolher a forma certa com a importada do
+   * lado, muitas vezes. Este botao e o caminho do diagnostico para o treino, e
+   * ele cabe aqui porque e aqui que o aluno acabou de ver o problema.
+   */
+  const train = useMutation({
+    mutationFn: async (languageCode: string) => {
+      const { data } = await api.post('/study/practice', { languageCode, type: 'traps' });
+      return data as { id: string };
+    },
+    onSuccess: (activity) => {
+      queryClient.invalidateQueries({ queryKey: ['session', 'today'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      navigate(`/sessao?activity=${activity.id}`);
+    },
   });
 
   if (!data || data.length === 0) return null;
@@ -71,6 +94,14 @@ export function InterferencePanel({ onOpenTopic }: { onOpenTopic: (topicId: stri
             <p className="text-sm text-wolf">
               Aparece em {pair.categories.map((c) => CATEGORY_LABEL[c] ?? c.toLowerCase()).join(', ')}.
             </p>
+
+            <button
+              className="btn-blue w-full"
+              onClick={() => train.mutate(pair.languageCode)}
+              disabled={train.isPending}
+            >
+              {train.isPending ? 'Abrindo...' : `Treinar as armadilhas em ${pair.languageName}`}
+            </button>
 
             {/* Os topicos sao os pontos em que os dois idiomas divergem -- por
                 isso resolvem esta interferencia especifica, e nao outra. */}

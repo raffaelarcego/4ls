@@ -5,11 +5,20 @@ import { ErrorsModule } from '../errors/errors.module';
 import { FoundationModule } from '../foundation/foundation.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { ReviewModule } from '../review/review.module';
+import { TrapsModule } from '../traps/traps.module';
 import { StudyController } from './study.controller';
 import { StudyService } from './study.service';
 
 @Module({
-  imports: [ReviewModule, ErrorsModule, GamificationModule, AlphabetModule, FoundationModule, AssessmentModule],
+  imports: [
+    ReviewModule,
+    ErrorsModule,
+    GamificationModule,
+    AlphabetModule,
+    FoundationModule,
+    AssessmentModule,
+    TrapsModule,
+  ],
   controllers: [StudyController],
   providers: [StudyService],
   exports: [StudyService],

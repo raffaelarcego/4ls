@@ -1,6 +1,11 @@
 import { Pillar } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
-import { LanguageState, pillarForType, planSession } from './mission.engine';
+import {
+  LanguageState,
+  pillarForType,
+  planSession,
+  PRACTICABLE_TYPES,
+} from './mission.engine';
 
 function language(overrides: Partial<LanguageState> = {}): LanguageState {
   return {
@@ -22,6 +27,7 @@ function language(overrides: Partial<LanguageState> = {}): LanguageState {
     needsAlphabet: false,
     needsFoundation: false,
     hasMorphology: false,
+    interferenceErrors: 0,
     ...overrides,
   };
 }
@@ -803,5 +809,59 @@ describe('morfologia (casos)', () => {
 
   it('esta sob LEARN: produzir a forma certa e treino', () => {
     expect(pillarForType('morphology')).toBe(Pillar.LEARN);
+  });
+});
+
+describe('armadilhas cruzadas', () => {
+  function fraco(overrides: Partial<LanguageState> = {}): LanguageState {
+    const state = language({ minutesPerDay: 60, ...overrides });
+    state.skills = {
+      listening: 10,
+      reading: 10,
+      writing: 10,
+      speaking: 10,
+      vocabScore: 10,
+      grammar: 10,
+    };
+    return state;
+  }
+
+  /**
+   * O bloco e movido pela EVIDENCIA, nao pela competencia: sem par confuso para
+   * desambiguar, ele treinaria uma confusao que este aluno nao tem -- e ainda
+   * tomaria a vaga de um bloco escolhido pela fraqueza real.
+   */
+  it('nao entra sem interferencia diagnosticada', () => {
+    const plan = planSession([fraco({ interferenceErrors: 0 })], 60);
+
+    expect(plan.activities.some((a) => a.type === 'traps')).toBe(false);
+  });
+
+  it('entra quando outro idioma esta vazando', () => {
+    const plan = planSession([fraco({ interferenceErrors: 6 })], 60);
+
+    expect(plan.activities.some((a) => a.type === 'traps')).toBe(true);
+  });
+
+  it('sobe na fila conforme a interferencia se acumula', () => {
+    const posicao = (errors: number) =>
+      planSession([fraco({ interferenceErrors: errors })], 60).activities.findIndex(
+        (a) => a.type === 'traps',
+      );
+
+    expect(posicao(12)).toBeLessThanOrEqual(posicao(1));
+  });
+
+  it('explica-se pelo numero de erros vindos de outro idioma', () => {
+    const plan = planSession([fraco({ interferenceErrors: 6 })], 60);
+    const bloco = plan.activities.find((a) => a.type === 'traps');
+
+    expect(bloco?.reason).toContain('outro idioma');
+  });
+
+  it('continua alcancavel pela pratica livre', () => {
+    // A bandeira governa a entrada AUTOMATICA. Pedir o bloco explicitamente
+    // continua valendo -- ali o catalogo curado preenche a rodada sozinho.
+    expect(PRACTICABLE_TYPES).toContain('traps');
   });
 });

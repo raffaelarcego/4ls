@@ -15,6 +15,7 @@ const TYPES = [
   'structure',
   'vocabulary',
   'morphology',
+  'traps',
   'production',
   'grammar',
   'listening',

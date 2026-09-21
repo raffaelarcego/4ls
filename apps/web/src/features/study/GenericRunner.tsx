@@ -21,6 +21,7 @@ import { PromotionRunner } from './PromotionRunner';
 import { ReadingRunner } from './ReadingRunner';
 import { SpeakingRunner } from './SpeakingRunner';
 import { StructureRunner } from './StructureRunner';
+import { TrapsRunner } from './TrapsRunner';
 import { VocabularyRunner } from './VocabularyRunner';
 
 interface Exercise {
@@ -97,6 +98,11 @@ export function GenericRunner({
   // A prova do mes: o unico bloco que mede em vez de ensinar.
   if (activity.type === 'assessment') {
     return <AssessmentRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // As armadilhas: o unico bloco cujo conteudo sai dos erros DELE, e o unico
+  // em que acertar fecha um erro aberto.
+  if (activity.type === 'traps') {
+    return <TrapsRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   // Os casos: so existem em alemao e russo, e sao o que a estrutura nao ensina
   // -- a ordem certa com a forma errada soa pior que a ordem trocada.

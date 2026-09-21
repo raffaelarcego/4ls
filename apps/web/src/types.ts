@@ -165,6 +165,32 @@ export interface StructureLesson {
   attempts: number;
 }
 
+/**
+ * Uma armadilha: a forma certa e a que sai quando outra língua vaza.
+ *
+ * `own` marca as que vieram de um erro que ele mesmo cometeu — a alternativa
+ * errada ali é literalmente a frase que ele escreveu.
+ */
+export interface TrapItem {
+  id: string;
+  sourceCode: string;
+  /** A ideia em português. Erro próprio nem sempre tem uma. */
+  gloss: string | null;
+  options: string[];
+  answer: string;
+  why: string;
+  own: boolean;
+}
+
+export interface TrapsLesson {
+  languageCode: string;
+  languageName: string;
+  level: string;
+  /** Quantos itens saíram de erros que ele mesmo cometeu. */
+  fromOwnErrors: number;
+  items: TrapItem[];
+}
+
 /** Uma linha da tabela de casos: a palavra naquele caso. */
 export interface ParadigmForm {
   slotId: string;

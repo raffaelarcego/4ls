@@ -241,6 +241,18 @@ Por isso a validação mais severa do módulo é o alinhamento (`alignedPassage`
 
 A escolha do texto do dia inverte a regra dos outros blocos: em vez do assunto menos dominado, vem a história que ele **já leu em outro idioma e ainda não leu neste** — é a segunda leitura que dá o andaime. As perguntas de compreensão são por idioma e de **detalhe**, nunca de ideia geral: na terceira leitura ele já sabe a história e acertaria de memória, sem ler uma linha.
 
+**Armadilhas cruzadas** (`apps/api/src/modules/traps/`)
+O Error Intelligence já sabia qual idioma estava contaminando qual, e o painel de interferência já dizia o que estudar. Só que ele parava no diagnóstico: mandava para uma **aula** sobre o ponto, e aula sobre interferência não desfaz interferência. O que desfaz é escolher a forma certa com a importada do lado, muitas vezes, até a primeira que vem à cabeça deixar de ser a errada.
+
+A fonte principal não é conteúdo novo — são **os erros dele**. `errors.userText` guarda a frase que ele escreveu e `errors.correctedText` a correção: um par mínimo perfeito, já no banco, sem custo de IA nenhum. É o único bloco de conteúdo do app que funciona com a chave de IA em branco. O catálogo curado (20 armadilhas) completa a rodada e cobre os pares que ele ainda não teve chance de errar — curado porque uma armadilha errada ensina o erro, e com *mais* confiança do que antes, já que ele acabou de "acertar" o exercício.
+
+E é aqui que um ciclo que o produto prometia pela metade finalmente fecha: **acertar a mesma armadilha algumas vezes resolve o erro**. Até agora `resolved` só mudava se alguém clicasse.
+
+Duas decisões de tela e de motor que valem registrar:
+
+- **A origem aparece antes da escolha**, não na explicação. Saber que "o espanhol está entrando aqui" é o que faz desconfiar da forma que parece natural — que é o hábito que o bloco existe para criar. Depois da resposta, a dica já não muda nada.
+- **O bloco é movido pela evidência, não pela competência.** Ele só entra no plano automático quando há interferência diagnosticada: sem par confuso para desambiguar, treinaria uma confusão que este aluno não tem, e ainda tomaria a vaga de um bloco escolhido pela fraqueza real. Pela prática livre ele continua acessível sempre.
+
 **Morphology Engine** (`apps/api/src/modules/morphology/`)
 Sobrava um buraco entre dois blocos que já existiam: a estrutura ensina a **ordem** das peças, o vocabulário ensina o **significado** da palavra, e nenhum dos dois ensina que a palavra **muda de forma**. Em alemão e russo ela muda em toda frase — e montar a ordem certa com a forma errada soa, para um nativo, pior que trocar a ordem.
 
@@ -313,6 +325,7 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
 - **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
 - **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Armadilhas cruzadas** — pares mínimos entre idiomas, em que a alternativa errada é a frase que sai quando outra língua vaza; a maior parte vem dos seus próprios erros, e acertar várias vezes **fecha** o erro
 - **Drill de casos** — em alemão e russo, a tabela viva de uma palavra que você já conhece, e a frase com a forma escondida; os distratores são as outras formas da mesma palavra
 - **Chefe de fase** — o exame que sobe o idioma de nível: abre quando o desempenho chega lá, cobra três rodadas com gabarito e, se você passar, todo o conteúdo daquele idioma sobe junto
 - **Leitura paralela** — a MESMA história lida nos quatro idiomas, alinhada frase a frase: tocar numa frase mostra o que ela diz e como ela fica nos outros três
@@ -367,6 +380,8 @@ GET  /api/concepts/coverage              quantos já existem nos 4 idiomas
 POST /api/concepts/learn                 aprende um termo — entra nos 4 de uma vez
 GET  /api/structure/lesson               a aula de formação de frase do dia
 POST /api/structure/record               resultado da rodada de montagem
+GET  /api/traps/lesson                   armadilhas de hoje: os erros dele + catálogo
+POST /api/traps/record                   resultado — acertar várias vezes fecha o erro
 GET  /api/morphology/lesson              a tabela de casos do dia (de e ru)
 POST /api/morphology/record              resultado por caso, não por aula
 GET  /api/promotion/status               o chefe de fase em cada idioma, e o que falta

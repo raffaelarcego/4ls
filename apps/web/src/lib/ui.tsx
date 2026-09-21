@@ -92,6 +92,9 @@ const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   // Só existe em alemão e russo: é o bloco que ensina a palavra a mudar de
   // forma, que é o que a estrutura e o vocabulário não ensinam.
   morphology: { label: 'Casos', blurb: 'A palavra muda conforme a função' },
+  // O único bloco cujo conteúdo sai dos erros dele: acertar várias vezes fecha
+  // o erro que gerou a armadilha.
+  traps: { label: 'Armadilhas', blurb: 'Um idioma entrando no outro' },
   listening: { label: 'Escuta', blurb: 'Diálogo falado + compreensão' },
   dictation: { label: 'Ditado', blurb: 'Ouvir e escrever' },
   reading: { label: 'Leitura', blurb: 'A mesma história nos 4 idiomas' },

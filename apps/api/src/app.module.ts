@@ -24,6 +24,7 @@ import { ReviewModule } from './modules/review/review.module';
 import { SpeechFeatureModule } from './modules/speech/speech.module';
 import { StructureModule } from './modules/structure/structure.module';
 import { StudyModule } from './modules/study/study.module';
+import { TrapsModule } from './modules/traps/traps.module';
 import { TutorModule } from './modules/tutor/tutor.module';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
 
@@ -52,6 +53,7 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     GamificationModule,
     GrammarModule,
     StudyModule,
+    TrapsModule,
     TutorModule,
     SpeechFeatureModule,
     DashboardModule,

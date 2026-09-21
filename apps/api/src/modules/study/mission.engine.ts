@@ -59,6 +59,14 @@ export interface LanguageState {
    * e um fato sobre a lingua, nao sobre ele.
    */
   hasMorphology: boolean;
+  /**
+   * Ocorrencias abertas de erro com origem NOUTRO idioma que ele estuda.
+   *
+   * E o que decide se o bloco de armadilhas concorre hoje. Zero significa que
+   * nao ha interferencia diagnosticada -- e um bloco de desambiguacao sem par
+   * confuso para desambiguar treinaria uma confusao que ele nao tem.
+   */
+  interferenceErrors: number;
 }
 
 export interface PlannedActivity {
@@ -94,6 +102,8 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   grammar: Pillar.LEARN,
   // Produzir a forma certa e treino de gramatica, como estrutura.
   morphology: Pillar.LEARN,
+  // Escolher entre a forma certa e a importada e treino, nao apresentacao.
+  traps: Pillar.LEARN,
   listening: Pillar.LISTEN,
   dictation: Pillar.LISTEN,
   reading: Pillar.LISTEN,
@@ -157,6 +167,9 @@ const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   // A terminacao errada com a ordem certa e erro de gramatica -- e o mesmo
   // campo que o bloco move ao ser concluido.
   morphology: 'grammar',
+  // Interferencia se manifesta como erro de gramatica, de artigo e de
+  // vocabulario; gramatica e o campo que o motor ja usa para os tres.
+  traps: 'grammar',
   listening: 'listening',
   // Ditado depende de escuta, mas concorre em separado -- a penalidade de
   // repeticao e o que faz um alternar com o outro entre as sessoes.
@@ -235,6 +248,7 @@ export const PRACTICABLE_TYPES = [
   'structure',
   'vocabulary',
   'morphology',
+  'traps',
   'production',
   'grammar',
   'listening',
@@ -620,6 +634,17 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
    */
   if (!language.hasMorphology) excluded.add('morphology');
 
+  /*
+   * Armadilhas so entram com interferencia diagnosticada. O bloco e movido pela
+   * EVIDENCIA, nao pela competencia: sem par confuso para desambiguar, ele
+   * treinaria uma confusao que este aluno nao tem -- e ainda tomaria a vaga de
+   * um bloco escolhido pela fraqueza real.
+   *
+   * Continua alcancavel pela pratica livre, onde o catalogo curado preenche a
+   * rodada sozinho. O que a bandeira governa e a entrada AUTOMATICA.
+   */
+  if (language.interferenceErrors <= 0) excluded.add('traps');
+
   const candidates = Object.keys(SKILL_BY_TYPE).filter((type) => !excluded.has(type));
 
   const ranked = candidates.map<RankedType>((type) => {
@@ -641,6 +666,21 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
           ERROR_TO_TYPE[category] === type || SECONDARY_ERROR_TO_TYPE[category] === type,
       )
       .reduce((sum, [, count]) => sum + count, 0);
+
+    /*
+     * A interferencia pontua o bloco de armadilhas direto, sem passar pelas
+     * categorias: o que o move nao e "erro de artigo" nem "erro de ordem", e o
+     * fato de OUTRO IDIOMA estar vazando -- categoria nenhuma captura isso, e e
+     * justamente por isso que o campo de origem existe.
+     */
+    if (type === 'traps') {
+      score += language.interferenceErrors * 10;
+      reasons.push(
+        `${language.interferenceErrors} ${
+          language.interferenceErrors === 1 ? 'erro vindo' : 'erros vindos'
+        } de outro idioma que voce estuda`,
+      );
+    }
 
     if (relatedErrors > 0) {
       score += relatedErrors * 8;

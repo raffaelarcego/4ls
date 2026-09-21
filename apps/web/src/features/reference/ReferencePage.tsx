@@ -203,13 +203,41 @@ function Entries({
   );
 }
 
+/**
+ * A partir de quantos caracteres o "símbolo" deixa de ser um símbolo.
+ *
+ * O russo põe uma letra aqui ("Р р"); o alemão põe uma frase inteira
+ * ("sp- / st- (no começo da palavra)"). São conteúdos diferentes no mesmo
+ * campo, e o mesmo tamanho de fonte não serve aos dois.
+ */
+const GLYPH_MAX = 6;
+
 function EntryCard({ entry, languageCode }: { entry: ReferenceEntry; languageCode: string }) {
+  const isGlyph = entry.symbol.trim().length <= GLYPH_MAX;
+
   return (
     <div className="card space-y-2 p-4">
       <div className="flex items-start gap-3">
+        {/*
+          `shrink-0` e `text-3xl` estavam fixos aqui, e os dois juntos quebravam
+          a tela inteira em alemão: "sp- / st- (no começo da palavra)" mede 404px
+          nesse corpo, não encolhe e não quebra linha -- então empurrava a página
+          para 459px num aparelho de 320px, e com ela a barra de abas, que passava
+          a aparecer esticada e a permitir arrastar de lado.
+
+          O russo nunca mostrou o problema porque lá o campo tem uma letra só, que
+          é para o que ele foi desenhado. A correção não é encolher tudo: símbolo
+          curto continua grande, que é o que faz a tabela ser consultável de
+          relance. O que muda é o caso em que o "símbolo" é, na verdade, uma
+          frase -- aí ele vira texto, encolhe e quebra linha como texto.
+        */}
         <span
           lang={languageCode}
-          className="min-w-[3.5rem] shrink-0 font-serif text-3xl leading-none text-eel"
+          className={
+            isGlyph
+              ? 'min-w-[3.5rem] shrink-0 font-serif text-3xl leading-none text-eel'
+              : 'min-w-[3.5rem] max-w-[45%] shrink break-words font-serif text-lg leading-tight text-eel'
+          }
         >
           {entry.symbol}
         </span>

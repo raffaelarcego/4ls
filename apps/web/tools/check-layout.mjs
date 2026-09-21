@@ -123,6 +123,14 @@ const dashboard = {
 /**
  * A consulta e a tela mais propensa a vazar de lado: ela mostra letras
  * grandes, transliteracao e uma nota de armadilha longa lado a lado.
+ *
+ * A fixture mistura dois formatos de "simbolo" DE PROPOSITO, porque o catalogo
+ * real mistura: no russo o campo tem uma letra ("Р р"), no alemao ele tem uma
+ * frase inteira ("sp- / st- (no comeco da palavra)"). Foi a segunda que quebrou
+ * a tela em producao -- o simbolo vinha com `shrink-0` e corpo 3xl, entao media
+ * 404px, nao encolhia e nao quebrava linha: empurrava a pagina para 459px num
+ * aparelho de 320px e levava a barra de abas junto, esticada e arrastavel de
+ * lado. Com so a letra russa aqui, a medicao passava.
  */
 const reference = {
   languageCode: 'ru',
@@ -144,6 +152,15 @@ const reference = {
           exampleMeaning: 'boca',
           exampleReading: 'rot',
           trap: 'Parece o P latino, mas é R. "рот" é "rot" (boca), nunca "pot".',
+        },
+        {
+          // O "simbolo" que e uma frase -- o caso do alemao.
+          symbol: 'sp- / st- (no começo da palavra)',
+          sound: 'shp / sht',
+          example: 'Straße',
+          exampleMeaning: 'rua',
+          exampleReading: 'shtrásse',
+          trap: 'O S inicial antes de p e t vira "sh". "Sport" é "shport".',
         },
       ],
     },

@@ -11,6 +11,7 @@ import { AlphabetService } from '../alphabet/alphabet.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { FoundationService } from '../foundation/foundation.service';
 import { hasMorphology } from '../morphology/morphology.catalog';
+import { TrapsService } from '../traps/traps.service';
 import {
   dailyTypesFor,
   LanguageState,
@@ -43,6 +44,7 @@ export class StudyService {
     private readonly alphabet: AlphabetService,
     private readonly foundation: FoundationService,
     private readonly assessment: AssessmentService,
+    private readonly traps: TrapsService,
   ) {}
 
   /**
@@ -80,6 +82,9 @@ export class StudyService {
     });
 
     const dueCounts = await this.reviews.dueCountByLanguage(userId);
+    // Uma consulta so para os quatro idiomas: o bloco de armadilhas depende
+    // dela, e pedir por idioma dentro do laco seriam quatro varreduras.
+    const interference = await this.traps.interferenceCountByLanguage(userId);
 
     // Tipos das ultimas 3 sessoes, por idioma, para forcar variedade.
     const recentActivities = await this.prisma.activity.findMany({
@@ -114,6 +119,7 @@ export class StudyService {
         needsFoundation: await this.foundation.needsFoundation(userId, code),
         // Fato sobre a lingua, nao sobre o aluno: vem do catalogo, sem consulta.
         hasMorphology: hasMorphology(code),
+        interferenceErrors: interference[code] ?? 0,
         recentTypes: recentActivities
           .filter((a) => a.language.code === code)
           .slice(0, 6)
@@ -548,6 +554,9 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // Terminacao certa e gramatica aplicada -- o mesmo campo que o motor usa para
   // ranquear o bloco.
   morphology: 'grammar',
+  // Desfazer interferencia melhora a mesma competencia que o motor consulta
+  // para ranquear o bloco.
+  traps: 'grammar',
   // Decodificar letra a som e leitura -- mesma competencia que o motor usa para
   // ranquear o bloco.
   alphabet: 'reading',
