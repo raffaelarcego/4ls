@@ -20,6 +20,7 @@ const XP_BY_TYPE: Record<string, number> = {
   contrast: 15,
   compare: 30,
   grammar: 15,
+  morphology: 20,
   dictation: 15,
   writing: 20,
   speaking: 25,

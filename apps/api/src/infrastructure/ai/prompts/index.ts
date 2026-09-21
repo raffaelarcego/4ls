@@ -887,6 +887,121 @@ Cada frase precisa das ${ctx.targets.length} realizacoes: "${codes}". Nenhuma po
 }
 
 // ---------------------------------------------------------------------------
+// Morfologia (casos)
+// ---------------------------------------------------------------------------
+
+export interface MorphologySlotSpec {
+  id: string;
+  name: string;
+  /** A pergunta que o caso responde, em portugues. */
+  question: string;
+  triggers: string[];
+}
+
+export interface MorphologyParadigmContext {
+  languageCode: string;
+  languageName: string;
+  level: string;
+  /** A palavra na forma do dicionario. */
+  term: string;
+  /** Como ela se le em portugues. */
+  gloss: string;
+  slots: MorphologySlotSpec[];
+}
+
+/**
+ * A tabela de uma palavra: ela escrita em todos os casos, com uma frase por caso.
+ *
+ * A parte que o exercicio depende, e que o prompt cobra em letras maiusculas, e
+ * o `gap`: o pedaco da frase que sera escondido tem de ser EXATAMENTE a forma
+ * daquele caso, escrito igual dentro da frase. E isso que permite corrigir sem
+ * IA -- e o que faz os distratores saírem de graca, porque os concorrentes
+ * certos sao as outras linhas da propria tabela.
+ *
+ * Uma terminacao errada aqui e o erro mais caro que este produto consegue
+ * cometer: a tabela fica guardada, e o aluno a repete em toda frase que usar
+ * aquela funcao. Por isso o pedido e explicito em preferir a palavra comum a
+ * palavra interessante, e em nao inventar forma para preencher a linha.
+ */
+export function morphologyParadigmPrompt(ctx: MorphologyParadigmContext): string {
+  const slots = ctx.slots
+    .map(
+      (s) =>
+        `- ${s.id} (${s.name}) -- responde "${s.question}"; aparece com: ${s.triggers.join(', ')}`,
+    )
+    .join('\n');
+
+  const ids = ctx.slots.map((s) => s.id).join('", "');
+  const cyrillic = ctx.languageCode === 'ru';
+
+  return `Voce escreve a tabela de casos de UMA palavra, para um brasileiro que estuda
+${ctx.languageName} no nivel ${ctx.level}. Ele fala portugues nativo, e o portugues nao
+marca caso em substantivo nenhum -- a ideia inteira e nova para ele.
+
+A PALAVRA: ${ctx.term} (${ctx.gloss})
+
+OS CASOS DESTE IDIOMA:
+${slots}
+
+Para CADA caso, devolva:
+1. A forma da palavra naquele caso (singular).
+2. Uma frase curta e natural, de nivel ${ctx.level}, em que a palavra aparece NAQUELE caso.
+3. O "gap": o pedaco da frase que sera escondido no exercicio.
+
+A REGRA QUE MANDA EM TODAS AS OUTRAS: o "gap" tem de ser EXATAMENTE a forma daquele
+caso, escrito letra por letra igual ao que esta dentro da frase. O exercicio esconde
+esse pedaco e pede que o aluno escolha entre as formas da tabela -- se o gap nao bater
+com a frase, ou nao bater com a forma, o exercicio fica sem resposta certa e ensina a
+terminacao errada. Confira antes de responder: procure o gap dentro da propria frase.
+
+Regras:
+- SE A PALAVRA NAO FOR UM SUBSTANTIVO, ou se ela nao declinar neste idioma, devolva
+  "forms": [] e "examples": []. Inventar uma tabela para uma palavra que nao tem tabela e
+  pior que nao entregar nada -- e o aluno decoraria terminacoes que nao existem.
+- Terminacao errada e o pior erro possivel aqui: a tabela fica guardada e o aluno a
+  repete em toda frase daquela funcao. Na duvida entre a forma comum e a forma
+  interessante, use a comum.
+- A frase de cada caso tem de EXIGIR aquele caso de verdade -- com a preposicao ou o
+  verbo que o dispara. Frase que funcionaria com outro caso nao ensina nada.
+- Frases curtas, do dia a dia, no nivel ${ctx.level}. Nada de vocabulario dificil em volta:
+  o que esta sendo ensinado e a terminacao, nao o resto da frase.
+- "note" e uma linha em portugues sobre o que mudou naquela forma (a terminacao, o
+  artigo, o deslocamento do acento). Deixe null quando nao houver nada a dizer.
+- "pattern" e o padrao de declinacao em portugues, ex.: "feminino em -a".
+- "gender" e o genero da palavra, em portugues. Null se o idioma nao marcar.${
+    cyrillic
+      ? '\n- Escreva em cirilico e ponha a transliteracao em "romanization", inclusive nas frases.'
+      : '\n- "romanization" e null neste idioma.'
+  }
+
+Responda APENAS com JSON valido, sem nenhum texto fora dele:
+{
+  "term": "${ctx.term}",
+  "gloss": "${ctx.gloss}",
+  "gender": "o genero em portugues, ou null",
+  "pattern": "o padrao de declinacao em portugues",
+  "forms": [
+    {
+      "slotId": "${ctx.slots[0]?.id ?? 'nom'}",
+      "form": "a palavra neste caso",
+      "romanization": "a transliteracao, ou null",
+      "note": "o que mudou nesta forma, ou null"
+    }
+  ],
+  "examples": [
+    {
+      "slotId": "${ctx.slots[0]?.id ?? 'nom'}",
+      "sentence": "a frase inteira, com a palavra neste caso",
+      "romanization": "a transliteracao da frase, ou null",
+      "translation": "a frase em portugues",
+      "gap": "o pedaco da frase a esconder -- identico a forma deste caso"
+    }
+  ]
+}
+Precisa haver uma forma E um exemplo para cada um dos ${ctx.slots.length} casos: "${ids}".`;
+}
+
+// ---------------------------------------------------------------------------
 // Leitura paralela
 // ---------------------------------------------------------------------------
 

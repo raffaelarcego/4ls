@@ -631,6 +631,66 @@ model SentencePattern {
   @@map("sentence_patterns")
 }
 
+// ============================== Morfologia (casos) ==============================
+
+/**
+ * O paradigma de UMA palavra: ela escrita em todos os casos do idioma.
+ *
+ * O bloco de estrutura ensina a ordem das pecas e o de vocabulario ensina o
+ * significado; nenhum dos dois ensina que a palavra MUDA DE FORMA conforme a
+ * funcao -- e em alemao e russo ela muda em toda frase.
+ *
+ * A palavra vem do vocabulario do proprio aluno, e nao de uma lista de exemplo:
+ * declinar "стол" para quem nunca viu "стол" ensina duas coisas ao mesmo tempo,
+ * e a terminacao e a que se perde.
+ *
+ * Os exemplos guardados junto sao o que torna o exercicio corrigivel sem IA: a
+ * frase tem a palavra num caso, e os distratores sao as OUTRAS formas da mesma
+ * tabela -- os concorrentes certos, de graca.
+ */
+model MorphologyParadigm {
+  id           String  @id @default(uuid())
+  languageCode String
+  /**
+   * O conceito por tras da palavra, quando ela veio de um. Opcional porque
+   * termo criado a mao pode nao ter conceito.
+   */
+  conceptId    String?
+  /**
+   * A forma do dicionario. Chave da palavra dentro do idioma.
+   */
+  term         String
+  /**
+   * Como ela se le em portugues, ex.: "o trabalho".
+   */
+  gloss        String
+  /**
+   * O genero, quando o idioma tem. Decide metade das terminacoes.
+   */
+  gender       String?
+  /**
+   * O padrao de declinacao, em portugues, ex.: "feminino em -a".
+   */
+  pattern      String
+  /**
+   * Uma entrada por caso: forma, romanizacao e o que reparar nela.
+   */
+  forms        Json
+  /**
+   * Frases de exemplo, uma por caso, com a palavra ja flexionada e o pedaco
+   * exato que sera escondido no exercicio.
+   */
+  examples     Json
+
+  timesUsed  Int      @default(0)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([languageCode, term])
+  @@index([languageCode])
+  @@map("morphology_paradigms")
+}
+
 // ========================== Leitura paralela (4 idiomas) ==========================
 
 /**

@@ -15,6 +15,7 @@ import { CanDoContrastRunner } from './CanDoContrastRunner';
 import { DictationRunner } from './DictationRunner';
 import { FoundationRunner } from './FoundationRunner';
 import { ListeningRunner } from './ListeningRunner';
+import { MorphologyRunner } from './MorphologyRunner';
 import { ProductionRunner } from './ProductionRunner';
 import { PromotionRunner } from './PromotionRunner';
 import { ReadingRunner } from './ReadingRunner';
@@ -96,6 +97,11 @@ export function GenericRunner({
   // A prova do mes: o unico bloco que mede em vez de ensinar.
   if (activity.type === 'assessment') {
     return <AssessmentRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // Os casos: so existem em alemao e russo, e sao o que a estrutura nao ensina
+  // -- a ordem certa com a forma errada soa pior que a ordem trocada.
+  if (activity.type === 'morphology') {
+    return <MorphologyRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'structure') {
     return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;

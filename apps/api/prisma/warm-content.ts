@@ -6,6 +6,7 @@ import { PrismaService } from '../src/infrastructure/database/prisma.service';
 import { StructureService } from '../src/modules/structure/structure.service';
 import { CanDoService } from '../src/modules/cando/can-do.service';
 import { ReadingService } from '../src/modules/reading/reading.service';
+import { MorphologyService } from '../src/modules/morphology/morphology.service';
 
 /**
  * Prepara o conteudo de estudo ANTES da hora do estudo.
@@ -52,6 +53,7 @@ async function main() {
   const structure = app.get(StructureService);
   const cando = app.get(CanDoService);
   const reading = app.get(ReadingService);
+  const morphology = app.get(MorphologyService);
 
   const users = await prisma.user.findMany({
     where: onlyEmail ? { email: onlyEmail } : undefined,
@@ -91,6 +93,23 @@ async function main() {
         // Um idioma que falha nao pode levar os outros junto: o proximo aluno
         // e o proximo idioma ainda valem a pena.
         logger.error(`${user.email} / ${code}: ${(error as Error).message}`);
+      }
+
+      /*
+       * As tabelas de caso sao por idioma, e so existem em alemao e russo --
+       * `warm` devolve zero nos outros sem gastar nada. Ficam dentro do laco por
+       * idioma, ao contrario da can-do e da leitura, porque a declinacao e um
+       * fato daquela lingua e nao atravessa as quatro.
+       */
+      try {
+        const created = await morphology.warm(user.id, code);
+        generated += created;
+        if (created > 0) {
+          logger.log(`${user.email} / ${code}: ${created} tabela(s) de casos.`);
+        }
+      } catch (error) {
+        failures += 1;
+        logger.error(`${user.email} / ${code} (casos): ${(error as Error).message}`);
       }
     }
 

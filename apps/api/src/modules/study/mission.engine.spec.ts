@@ -21,6 +21,7 @@ function language(overrides: Partial<LanguageState> = {}): LanguageState {
     recentTypes: [],
     needsAlphabet: false,
     needsFoundation: false,
+    hasMorphology: false,
     ...overrides,
   };
 }
@@ -738,5 +739,69 @@ describe('avaliacao periodica', () => {
     const plan = planSession([state], 40);
 
     expect(plan.activities.some((a) => a.type === 'assessment')).toBe(false);
+  });
+});
+
+describe('morfologia (casos)', () => {
+  /** Um idioma com tudo fraco: o ranqueamento tem vaga para quase todo mundo. */
+  function fraco(overrides: Partial<LanguageState> = {}): LanguageState {
+    const state = language({ minutesPerDay: 60, ...overrides });
+    state.skills = {
+      listening: 10,
+      reading: 10,
+      writing: 10,
+      speaking: 10,
+      vocabScore: 10,
+      grammar: 10,
+    };
+    return state;
+  }
+
+  it('nao existe num idioma que nao marca caso', () => {
+    // Servir "casos do ingles" seria inventar assunto -- e ainda gastaria com
+    // ele a vaga de um bloco que ensinaria alguma coisa.
+    const plan = planSession([fraco({ hasMorphology: false })], 60);
+
+    expect(plan.activities.some((a) => a.type === 'morphology')).toBe(false);
+  });
+
+  it('concorre no idioma que marca caso', () => {
+    const plan = planSession([fraco({ code: 'de', name: 'Deutsch', hasMorphology: true })], 60);
+
+    expect(plan.activities.some((a) => a.type === 'morphology')).toBe(true);
+  });
+
+  /**
+   * Artigo e preposicao continuam apontando para gramatica -- em ingles e
+   * espanhol e ali que o erro se resolve. Mas em alemao e russo os dois sao
+   * quase sempre o mesmo erro: o caso errado.
+   */
+  it('erro de artigo puxa os casos para cima onde eles existem', () => {
+    const comErro = planSession(
+      [fraco({ code: 'de', hasMorphology: true, errorCounts: { ARTICLE: 9 } })],
+      60,
+    ).activities;
+    const semErro = planSession([fraco({ code: 'de', hasMorphology: true })], 60).activities;
+
+    const posicao = (blocos: typeof comErro) =>
+      blocos.findIndex((a) => a.type === 'morphology');
+
+    expect(posicao(comErro)).toBeGreaterThanOrEqual(0);
+    expect(posicao(comErro)).toBeLessThanOrEqual(posicao(semErro));
+  });
+
+  it('erro de artigo continua puxando gramatica onde nao ha caso', () => {
+    // Sem esta garantia, mover o reforco para morfologia deixaria os erros de
+    // artigo do ingles e do espanhol sem destino nenhum.
+    const plan = planSession(
+      [fraco({ hasMorphology: false, errorCounts: { ARTICLE: 9 } })],
+      60,
+    );
+
+    expect(plan.activities.some((a) => a.type === 'grammar')).toBe(true);
+  });
+
+  it('esta sob LEARN: produzir a forma certa e treino', () => {
+    expect(pillarForType('morphology')).toBe(Pillar.LEARN);
   });
 });

@@ -14,6 +14,7 @@ export type AiTask =
   | 'structure.generate'
   | 'cando.generate'
   | 'reading.generate'
+  | 'morphology.generate'
   | 'lesson.generate'
   | 'listening.generate'
   | 'dictation.generate'
@@ -55,6 +56,12 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // desalinhada quebra justamente a comparacao lado a lado que o bloco existe
   // para fazer. O texto ainda entra num pool e e lido quatro vezes.
   'reading.generate',
+  // A tabela de casos e o conteudo mais perigoso do produto: uma terminacao
+  // errada fica guardada e o aluno a repete em TODA frase daquela funcao. E o
+  // exercicio depende de um casamento exato entre o pedaco escondido e a forma
+  // da tabela -- o modelo rapido erra esse casamento com frequencia, e o
+  // exercicio sai sem resposta certa.
+  'morphology.generate',
   // Traduzir um conceito e curto, mas erra de um jeito que estraga: uma palavra
   // pouco natural em russo vira card e o aluno decora o que ninguem diz.
   'concept.translate',

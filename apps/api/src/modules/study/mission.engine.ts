@@ -50,6 +50,15 @@ export interface LanguageState {
    * quem nao tem nenhum dos tres nao a acompanha.
    */
   needsFoundation: boolean;
+  /**
+   * O idioma marca caso no substantivo (alemao e russo).
+   *
+   * Sem esta bandeira o ranqueamento ofereceria "casos do ingles" -- um assunto
+   * que nao existe -- e ainda gastaria com ele a vaga de um bloco que ensinaria
+   * alguma coisa. Ela vem do catalogo de morfologia, nao do progresso do aluno:
+   * e um fato sobre a lingua, nao sobre ele.
+   */
+  hasMorphology: boolean;
 }
 
 export interface PlannedActivity {
@@ -83,6 +92,8 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   // Producao livre e uso real da lingua, nao treino de forma.
   production: Pillar.LIVE,
   grammar: Pillar.LEARN,
+  // Produzir a forma certa e treino de gramatica, como estrutura.
+  morphology: Pillar.LEARN,
   listening: Pillar.LISTEN,
   dictation: Pillar.LISTEN,
   reading: Pillar.LISTEN,
@@ -112,6 +123,21 @@ const ERROR_TO_TYPE: Record<string, string> = {
   COMPREHENSION: 'listening',
 };
 
+/**
+ * Categorias de erro que puxam um SEGUNDO tipo para cima, alem do principal.
+ *
+ * Artigo e preposicao continuam apontando para gramatica, e isso nao muda: em
+ * ingles e espanhol e ali mesmo que o erro se resolve. Mas em alemao e russo os
+ * dois sao quase sempre o mesmo erro -- o caso errado --, e quem erra "mit der
+ * Mann" nao precisa de uma aula de gramatica, precisa produzir dativo vinte
+ * vezes. Como `morphology` nem concorre nos idiomas sem caso, o reforco so tem
+ * efeito onde ele significa alguma coisa.
+ */
+const SECONDARY_ERROR_TO_TYPE: Record<string, string> = {
+  ARTICLE: 'morphology',
+  PREPOSITION: 'morphology',
+};
+
 /** Subcompetencia que governa a necessidade de cada tipo. */
 const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   vocabulary: 'vocabScore',
@@ -128,6 +154,9 @@ const SKILL_BY_TYPE: Record<string, keyof LanguageState['skills']> = {
   // Produzir a mesma frase nos quatro de memoria e escrita, como a producao.
   compare: 'writing',
   grammar: 'grammar',
+  // A terminacao errada com a ordem certa e erro de gramatica -- e o mesmo
+  // campo que o bloco move ao ser concluido.
+  morphology: 'grammar',
   listening: 'listening',
   // Ditado depende de escuta, mas concorre em separado -- a penalidade de
   // repeticao e o que faz um alternar com o outro entre as sessoes.
@@ -205,6 +234,7 @@ export const PRACTICABLE_TYPES = [
   'foundation',
   'structure',
   'vocabulary',
+  'morphology',
   'production',
   'grammar',
   'listening',
@@ -583,6 +613,13 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
     ...PRE_STRUCTURE_TYPES,
     ...CROSS_LANGUAGE_TYPES,
   ]);
+  /*
+   * Morfologia so existe onde a lingua marca caso. Ingles e espanhol nao marcam,
+   * e servir o bloco neles seria inventar assunto -- ainda por cima gastando a
+   * vaga de um bloco util.
+   */
+  if (!language.hasMorphology) excluded.add('morphology');
+
   const candidates = Object.keys(SKILL_BY_TYPE).filter((type) => !excluded.has(type));
 
   const ranked = candidates.map<RankedType>((type) => {
@@ -599,7 +636,10 @@ function rankTypes(language: LanguageState, dailyTypes: string[]): RankedType[] 
 
     // Erros abertos que apontam para este tipo.
     const relatedErrors = Object.entries(language.errorCounts)
-      .filter(([category]) => ERROR_TO_TYPE[category] === type)
+      .filter(
+        ([category]) =>
+          ERROR_TO_TYPE[category] === type || SECONDARY_ERROR_TO_TYPE[category] === type,
+      )
       .reduce((sum, [, count]) => sum + count, 0);
 
     if (relatedErrors > 0) {

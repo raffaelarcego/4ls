@@ -165,6 +165,63 @@ export interface StructureLesson {
   attempts: number;
 }
 
+/** Uma linha da tabela de casos: a palavra naquele caso. */
+export interface ParadigmForm {
+  slotId: string;
+  form: string;
+  romanization?: string | null;
+  /** O que mudou nesta forma. Null quando não há nada a dizer. */
+  note?: string | null;
+}
+
+/** Um caso do idioma, do catálogo. */
+export interface MorphologySlotInfo {
+  id: string;
+  name: string;
+  /** A pergunta que ele responde — é ela que ensina, não o nome. */
+  question: string;
+  triggers?: string[];
+  trap?: string;
+  /** Fora do nível dele ainda: aparece na tabela, não entra no treino. */
+  locked?: boolean;
+}
+
+/**
+ * Um exercício: a frase com a forma escondida.
+ *
+ * As alternativas são as outras formas da MESMA palavra — os concorrentes
+ * reais, e é isso que torna o exercício corrigível sem IA.
+ */
+export interface MorphologyDrill {
+  slotId: string;
+  term: string;
+  sentence: string;
+  romanization?: string | null;
+  translation: string;
+  options: string[];
+  answer: string;
+}
+
+/** A aula de casos do dia, num idioma. */
+export interface MorphologyLesson {
+  languageCode: string;
+  languageName: string;
+  level: string;
+  /** O caso em foco hoje. */
+  slot: MorphologySlotInfo & { triggers: string[]; trap: string };
+  /** Todos os casos do idioma, para a tabela mostrar o mapa inteiro. */
+  slots: MorphologySlotInfo[];
+  mastery: Record<string, number>;
+  word: {
+    term: string;
+    gloss: string;
+    gender?: string | null;
+    pattern: string;
+    forms: ParadigmForm[];
+  };
+  drills: MorphologyDrill[];
+}
+
 /** As tres rodadas do chefe de fase. */
 export type PromotionRound = 'sentences' | 'reading' | 'vocabulary';
 

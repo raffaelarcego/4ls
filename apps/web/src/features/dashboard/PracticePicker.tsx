@@ -14,6 +14,7 @@ const TYPES = [
   'foundation',
   'structure',
   'vocabulary',
+  'morphology',
   'production',
   'grammar',
   'listening',

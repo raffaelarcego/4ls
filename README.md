@@ -241,6 +241,19 @@ Por isso a validação mais severa do módulo é o alinhamento (`alignedPassage`
 
 A escolha do texto do dia inverte a regra dos outros blocos: em vez do assunto menos dominado, vem a história que ele **já leu em outro idioma e ainda não leu neste** — é a segunda leitura que dá o andaime. As perguntas de compreensão são por idioma e de **detalhe**, nunca de ideia geral: na terceira leitura ele já sabe a história e acertaria de memória, sem ler uma linha.
 
+**Morphology Engine** (`apps/api/src/modules/morphology/`)
+Sobrava um buraco entre dois blocos que já existiam: a estrutura ensina a **ordem** das peças, o vocabulário ensina o **significado** da palavra, e nenhum dos dois ensina que a palavra **muda de forma**. Em alemão e russo ela muda em toda frase — e montar a ordem certa com a forma errada soa, para um nativo, pior que trocar a ordem.
+
+O catálogo de contrastes já *explica* os casos. Aqui não se explica: produz-se. O que é curado (`morphology.catalog.ts`) são os **casos** — dez ao todo nos dois idiomas —, cada um com a pergunta que responde ("a quem?"), o que o dispara e a armadilha do brasileiro. A palavra vem por fora, do **vocabulário do próprio aluno**: declinar "стол" para quem nunca viu "стол" ensina duas coisas ao mesmo tempo, e a terminação é a que se perde.
+
+O exercício é corrigível sem IA, e isso não é economia — é o mesmo argumento da prova: os distratores são as **outras formas da mesma palavra**, tiradas da tabela. Os concorrentes reais, de graça.
+
+Três coisas que o módulo trata e são fáceis de errar:
+
+- **A validação do `gap`.** O pedaço escondido tem de ser exatamente a forma daquele caso *e* estar dentro da frase. Sem isso o enunciado sai sem lacuna, ou com uma resposta certa que não está entre as alternativas — e o aluno erra uma questão impossível, que vai para o progresso do caso.
+- **Forma torta reprova a tabela inteira; exemplo torto só é descartado.** A assimetria é deliberada: um exemplo a menos custa um exercício, uma terminação errada fica guardada e é repetida em toda frase daquela função — no lugar exato onde ele iria conferir.
+- **O bloco não existe em inglês e espanhol.** O motor da sessão consulta `hasMorphology` antes de ranqueá-lo; sem isso ele ofereceria "casos do inglês" e ainda gastaria com isso a vaga de um bloco útil. Em compensação, erros de **artigo e preposição** passam a reforçar os casos onde eles existem — quem erra "mit der Mann" não precisa de uma aula de gramática, precisa produzir dativo vinte vezes.
+
 **CEFR Engine / chefe de fase** (`apps/api/src/modules/promotion/`)
 O CEFR era meio motor: as subcompetências eram rastreadas, a nota composta calculada, `suggestedLevel` dizia "dá para subir" — e nada acontecia. Como o nível é o teto de todo o conteúdo (can-do, leitura, estrutura), o idioma ficava preso onde começou, por construção.
 
@@ -300,6 +313,7 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
 - **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
 - **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Drill de casos** — em alemão e russo, a tabela viva de uma palavra que você já conhece, e a frase com a forma escondida; os distratores são as outras formas da mesma palavra
 - **Chefe de fase** — o exame que sobe o idioma de nível: abre quando o desempenho chega lá, cobra três rodadas com gabarito e, se você passar, todo o conteúdo daquele idioma sobe junto
 - **Leitura paralela** — a MESMA história lida nos quatro idiomas, alinhada frase a frase: tocar numa frase mostra o que ela diz e como ela fica nos outros três
 - **Captura de texto** — cole um artigo e o vocabulário dele entra como conceito, já nos quatro idiomas
@@ -353,6 +367,8 @@ GET  /api/concepts/coverage              quantos já existem nos 4 idiomas
 POST /api/concepts/learn                 aprende um termo — entra nos 4 de uma vez
 GET  /api/structure/lesson               a aula de formação de frase do dia
 POST /api/structure/record               resultado da rodada de montagem
+GET  /api/morphology/lesson              a tabela de casos do dia (de e ru)
+POST /api/morphology/record              resultado por caso, não por aula
 GET  /api/promotion/status               o chefe de fase em cada idioma, e o que falta
 GET  /api/promotion/exam                 o exame de um idioma (403 com o chefe fechado)
 POST /api/promotion/attempt              o resultado — é ele que promove

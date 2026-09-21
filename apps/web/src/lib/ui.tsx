@@ -89,6 +89,9 @@ const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   compare: { label: 'Comparação', blurb: 'A mesma função, de memória' },
   production: { label: 'Produção', blurb: 'A mesma frase nos 4 idiomas' },
   grammar: { label: 'Gramática', blurb: 'Estrutura e formas' },
+  // Só existe em alemão e russo: é o bloco que ensina a palavra a mudar de
+  // forma, que é o que a estrutura e o vocabulário não ensinam.
+  morphology: { label: 'Casos', blurb: 'A palavra muda conforme a função' },
   listening: { label: 'Escuta', blurb: 'Diálogo falado + compreensão' },
   dictation: { label: 'Ditado', blurb: 'Ouvir e escrever' },
   reading: { label: 'Leitura', blurb: 'A mesma história nos 4 idiomas' },

@@ -10,6 +10,7 @@ import { ReviewService } from '../review/review.service';
 import { AlphabetService } from '../alphabet/alphabet.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { FoundationService } from '../foundation/foundation.service';
+import { hasMorphology } from '../morphology/morphology.catalog';
 import {
   dailyTypesFor,
   LanguageState,
@@ -111,6 +112,8 @@ export class StudyService {
         errorCounts: Object.fromEntries(errorRows.map((e) => [e.category, e.occurrences])),
         needsAlphabet: await this.alphabet.needsAlphabet(userId, code),
         needsFoundation: await this.foundation.needsFoundation(userId, code),
+        // Fato sobre a lingua, nao sobre o aluno: vem do catalogo, sem consulta.
+        hasMorphology: hasMorphology(code),
         recentTypes: recentActivities
           .filter((a) => a.language.code === code)
           .slice(0, 6)
@@ -542,6 +545,9 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // consulta para decidir o dia seguinte.
   structure: 'grammar',
   grammar: 'grammar',
+  // Terminacao certa e gramatica aplicada -- o mesmo campo que o motor usa para
+  // ranquear o bloco.
+  morphology: 'grammar',
   // Decodificar letra a som e leitura -- mesma competencia que o motor usa para
   // ranquear o bloco.
   alphabet: 'reading',
