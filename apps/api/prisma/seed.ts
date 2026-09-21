@@ -20,6 +20,7 @@ const ACHIEVEMENTS = [
   { code: 'WORDS_100', name: '100 palavras', description: 'Tem 100 termos no vocabulario.', xp: 100 },
   { code: 'WORDS_1000', name: '1000 palavras', description: 'Tem 1000 termos no vocabulario.', xp: 1000 },
   { code: 'FIRST_CONVERSATION', name: 'Primeira conversa', description: 'Conversou com o tutor de IA.', xp: 75 },
+  { code: 'FIRST_PROMOTION', name: 'Primeiro chefe', description: 'Venceu um chefe de fase e subiu um idioma de nivel.', xp: 300 },
 ];
 
 /**

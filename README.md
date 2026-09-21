@@ -32,10 +32,20 @@ rodar duas vezes e seguro e continua de onde parou.
 ### Manutencao
 
 ```bash
+npm run content:warm -w @4l/api                  # prepara o conteudo de estudo antes da hora
 npm run db:enroll-languages                      # matricula usuarios antigos num idioma novo
 npm run db:merge-concepts -- <origem> <destino>   # funde dois conceitos que sao o mesmo significado
 npm run db:rewind -- 1                           # empurra as sessoes um dia para tras (dev)
 ```
+
+`content:warm` é o único que precisa rodar com alguma regularidade. As aulas de
+estrutura, as can-dos e os **textos de leitura** não são gerados durante a
+sessão: quatro idiomas numa resposta só levam minutos, e a função da Vercel
+morre aos 60s — o aluno recebia "network error" no meio do estudo. A sessão só
+lê conteúdo pronto, e quem paga o custo é este script, fora do horário de
+estudo. É idempotente: rodar com tudo preparado não custa nenhuma chamada de IA.
+Bloco cujo conteúdo ainda não foi preparado responde 503 dizendo exatamente
+isso.
 
 `db:enroll-languages` existe porque o cadastro matricula nos idiomas do momento e
 nunca mais volta ao assunto: quando o russo entrou, quem ja tinha conta ficou sem
@@ -217,6 +227,36 @@ O catálogo de padrões (`sentence-patterns.catalog.ts`) é **curado**, pela mes
 
 O padrão escolhido é o de menor domínio para o nível do aluno, não rotação cega: se a ordem do verbo alemão ainda não firmou, ela volta.
 
+**Reading Engine** (`apps/api/src/modules/reading/`)
+O bloco de leitura existia no planejador desde o início e não tinha texto nenhum: caía nos exercícios gerados, e "compreensão de texto" sem texto é um quiz com outro nome.
+
+O que entrou não é *um texto por idioma*, é **o mesmo texto**. O catálogo (`reading.catalog.ts`) é curado e guarda a premissa em português — a história inteira, com começo, meio e fim. É ela que amarra as quatro versões: sem premissa fixa, cada geração conta uma história parecida e a comparação morre. A IA escreve as quatro numa chamada só, cada uma no nível *daquele* idioma. O que varia por idioma é o tamanho da frase; a história, os fatos e a ordem são idênticos.
+
+Daí saem duas coisas que nenhuma leitura isolada dá:
+
+- **Andaime.** Ele lê primeiro no idioma mais forte. Quando o texto volta em russo, ele já sabe o que está escrito ali — e ler sabendo o conteúdo é o que permite ler acima do próprio nível sem travar na terceira linha. A tela diz isso no topo: "você já leu esta história em inglês".
+- **Contraste frase a frase.** As versões são alinhadas por **índice**: a frase 3 do alemão diz o que diz a frase 3 do inglês. Tocar numa frase abre a mesma frase nos outros três idiomas — o contraste no ponto exato em que a dúvida apareceu.
+
+Por isso a validação mais severa do módulo é o alinhamento (`alignedPassage`), e não a qualidade do texto. Uma versão que juntou duas frases numa desalinha tudo dali para a frente **com aparência de certo**: a tela continua mostrando quatro frases lado a lado, só que elas param de dizer a mesma coisa. Texto desalinhado é descartado inteiro.
+
+A escolha do texto do dia inverte a regra dos outros blocos: em vez do assunto menos dominado, vem a história que ele **já leu em outro idioma e ainda não leu neste** — é a segunda leitura que dá o andaime. As perguntas de compreensão são por idioma e de **detalhe**, nunca de ideia geral: na terceira leitura ele já sabe a história e acertaria de memória, sem ler uma linha.
+
+**CEFR Engine / chefe de fase** (`apps/api/src/modules/promotion/`)
+O CEFR era meio motor: as subcompetências eram rastreadas, a nota composta calculada, `suggestedLevel` dizia "dá para subir" — e nada acontecia. Como o nível é o teto de todo o conteúdo (can-do, leitura, estrutura), o idioma ficava preso onde começou, por construção.
+
+Havia dois jeitos de fechar isso. Promover sozinho quando a composta passa de 85 é o fácil, e promove a partir da **opinião do aluno**: metade das notas de competência vem de autoavaliação de fim de bloco. Subir de nível assim endurece o conteúdo com base em "achei que fui bem", e o engano só aparece três semanas depois.
+
+Então a nota composta deixou de promover e passou a fazer outra coisa: **abrir o chefe**. Quem promove é um exame com gabarito, sem IA — pelo mesmo motivo da prova mensal: uma nota dada por modelo varia entre execuções, e o que decide subir de nível não pode variar.
+
+Três rodadas, todas montadas do que ele **já estudou** naquele idioma: montar frases das can-dos, responder detalhes dos textos que leu, e reconhecer palavras que deu por aprendidas. Passa com 80% no conjunto **e** no mínimo 60% em cada rodada — o piso por rodada existe para impedir a aprovação torta, subir de nível acertando tudo de vocabulário e quase nada de montagem de frase.
+
+Duas consequências que o módulo trata e são fáceis de esquecer:
+
+- **Vencer encolhe as competências** (×0,6). Não é punição, é mudança de régua: 85 de gramática em A1 não é 85 em A2. Sem isso, a composta continuaria acima do portão e o chefe seguinte abriria no dia seguinte — A1 a B1 numa semana.
+- **Perder fecha o chefe por uma semana**, e o resultado diz **qual rodada afundou**. Sem espera, o exame vira tentativa e erro; sem apontar a rodada, "não passou" não ensina nada.
+
+O bloco nunca é planejado pelo Daily Mission Engine: ele aparece no painel quando o portão abre, e quem decide encarar é o aluno.
+
 **Daily Mission Engine** (`apps/api/src/modules/study/mission.engine.ts`)
 Planejador determinístico e auditável. Cada tipo de atividade recebe uma pontuação de necessidade a partir de três forças: fraqueza da competência, erros recorrentes abertos e variedade em relação às sessões recentes. Revisão vencida sempre vem primeiro. É isso que permite responder *por que* cada bloco foi recomendado — o motivo aparece na tela.
 
@@ -260,6 +300,8 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
 - **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
 - **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Chefe de fase** — o exame que sobe o idioma de nível: abre quando o desempenho chega lá, cobra três rodadas com gabarito e, se você passar, todo o conteúdo daquele idioma sobe junto
+- **Leitura paralela** — a MESMA história lida nos quatro idiomas, alinhada frase a frase: tocar numa frase mostra o que ela diz e como ela fica nos outros três
 - **Captura de texto** — cole um artigo e o vocabulário dele entra como conceito, já nos quatro idiomas
 - **Formação de frase por idioma** — bloco diário com a fórmula, os passos de montagem, exemplos fatiados em constituintes rotulados e exercícios de ordenação
 - Vocabulário em contexto (exemplo + tradução do exemplo, nunca "palavra = tradução")
@@ -279,9 +321,7 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 
 Estes itens da especificação ficaram fora desta entrega:
 
-- **Conteúdo de reading** — não há biblioteca de textos. O bloco de leitura ainda cai nos exercícios gerados, sem texto-fonte próprio.
 - **Avaliação de pronúncia** — o Speaking Lab avalia o que a transcrição revela (gramática, vocabulário, fluência, cumprimento da missão). Pronúncia em si exige análise do áudio, não do texto, e não está feita — o prompt é explícito em tratar qualquer suspeita de pronúncia como hipótese.
-- **CEFR Engine completo** (MVP 4) — as subcompetências são rastreadas e há uma nota composta ponderada com sugestão de nível, mas a promoção de nível ainda não é automática.
 - Notificações, A/B testing, biblioteca de conteúdo (MVP 5).
 
 ## Instalar no celular
@@ -313,6 +353,11 @@ GET  /api/concepts/coverage              quantos já existem nos 4 idiomas
 POST /api/concepts/learn                 aprende um termo — entra nos 4 de uma vez
 GET  /api/structure/lesson               a aula de formação de frase do dia
 POST /api/structure/record               resultado da rodada de montagem
+GET  /api/promotion/status               o chefe de fase em cada idioma, e o que falta
+GET  /api/promotion/exam                 o exame de um idioma (403 com o chefe fechado)
+POST /api/promotion/attempt              o resultado — é ele que promove
+GET  /api/reading/lesson                 o texto de hoje num idioma + as outras 3 versões
+POST /api/reading/record                 resultado da compreensão, por texto e idioma
 GET  /api/concepts/production/mission    o conceito da vez para produção livre
 POST /api/concepts/production/evaluate   avalia as 4 frases juntas
 POST /api/concepts/capture               extrai vocabulário de um texto colado

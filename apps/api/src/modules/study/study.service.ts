@@ -552,6 +552,10 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // Montar a frase com as primeiras pecas e gramatica, como estrutura -- e o
   // mesmo campo que o mission engine usa para ranquear os dois.
   foundation: 'grammar',
+  // O chefe de fase tambem fica de fora, e por um motivo mais forte que o da
+  // prova: vencer ENCOLHE as competencias de proposito (a regua do nivel novo e
+  // outra). Deixa-lo passar por aqui devolveria por cima o que a promocao
+  // acabou de baixar, e o chefe seguinte abriria no dia seguinte.
 };
 
 type SessionWithActivities = {

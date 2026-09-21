@@ -5,6 +5,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { activityTheme, languageTheme, scoreTone, SKILL_LABEL } from '../../lib/ui';
 import { api } from '../../services/api';
 import { DashboardData, DashboardLanguage, SessionActivity, XpSummary } from '../../types';
+import { BossCard } from './BossCard';
 import { PracticePicker } from './PracticePicker';
 
 /** XP de cada tipo de bloco -- a mesma tabela do backend (`xp.rules.ts`). */
@@ -24,6 +25,7 @@ const XP_BY_TYPE: Record<string, number> = {
   speaking: 25,
   production: 40,
   tutor: 50,
+  promotion: 60,
 };
 
 export function DashboardPage() {
@@ -123,6 +125,14 @@ export function DashboardPage() {
               : 'Iniciar missão'}
         </button>
       </section>
+
+      {/*
+        O chefe vem DEPOIS da missao do dia e ANTES da pratica livre.
+        Antes da missao ele competiria com o que o aluno veio fazer; depois da
+        pratica livre viraria rodape. Aqui ele e a recompensa que aparece quando
+        o dia ja esta encaminhado.
+      */}
+      <BossCard />
 
       <PracticePicker languages={languages} />
 

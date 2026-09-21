@@ -13,6 +13,7 @@ export type AiTask =
   | 'production.evaluate'
   | 'structure.generate'
   | 'cando.generate'
+  | 'reading.generate'
   | 'lesson.generate'
   | 'listening.generate'
   | 'dictation.generate'
@@ -48,6 +49,12 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // entrega quatro frases sobre assuntos parecidos em vez da mesma frase -- e
   // uma aula assim destroi justamente a comparacao que ela deveria ensinar.
   'cando.generate',
+  // As quatro versoes de um texto de leitura tem de ser a MESMA historia,
+  // alinhada frase a frase. O modelo rapido conta a historia parecida em cada
+  // idioma e junta duas frases numa quando lhe convem -- e uma versao
+  // desalinhada quebra justamente a comparacao lado a lado que o bloco existe
+  // para fazer. O texto ainda entra num pool e e lido quatro vezes.
+  'reading.generate',
   // Traduzir um conceito e curto, mas erra de um jeito que estraga: uma palavra
   // pouco natural em russo vira card e o aluno decora o que ninguem diz.
   'concept.translate',

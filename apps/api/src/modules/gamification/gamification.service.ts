@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PROMOTION_WON } from '../promotion/promotion.rules';
 import { levelFromXp } from './levels';
 
 /** Conquistas avaliadas apos cada sessao concluida. */
@@ -14,6 +15,9 @@ const ACHIEVEMENT_RULES: Array<{
   { code: 'WORDS_1000', check: (s) => s.vocabularyCount >= 1000 },
   { code: 'FIRST_CONVERSATION', check: (s) => s.conversations >= 1 },
   { code: 'TEN_SESSIONS', check: (s) => s.sessionsCompleted >= 10 },
+  // Subir um idioma de nivel e o unico degrau do app que diz algo sobre a
+  // lingua -- o resto da progressao e XP, que sobe todo dia.
+  { code: 'FIRST_PROMOTION', check: (s) => s.promotions >= 1 },
 ];
 
 interface UserStats {
@@ -21,6 +25,8 @@ interface UserStats {
   streak: number;
   vocabularyCount: number;
   conversations: number;
+  /** Chefes de fase vencidos. */
+  promotions: number;
 }
 
 @Injectable()
@@ -111,14 +117,24 @@ export class GamificationService {
 
   /** Avalia todas as regras e desbloqueia o que for novo. Retorna as novas. */
   async evaluateAchievements(userId: string) {
-    const [sessionsCompleted, streak, vocabularyCount, conversations] = await Promise.all([
-      this.prisma.studySession.count({ where: { userId, completed: true } }),
-      this.getStreak(userId).then((s) => s.current),
-      this.prisma.userVocabulary.count({ where: { userId } }),
-      this.prisma.conversation.count({ where: { userId } }),
-    ]);
+    const [sessionsCompleted, streak, vocabularyCount, conversations, promotions] =
+      await Promise.all([
+        this.prisma.studySession.count({ where: { userId, completed: true } }),
+        this.getStreak(userId).then((s) => s.current),
+        this.prisma.userVocabulary.count({ where: { userId } }),
+        this.prisma.conversation.count({ where: { userId } }),
+        // Conta pela pericia da vitoria: a derrota e guardada com outra, entao
+        // nao ha JSON para ler aqui.
+        this.prisma.assessment.count({ where: { userId, skill: PROMOTION_WON } }),
+      ]);
 
-    const stats: UserStats = { sessionsCompleted, streak, vocabularyCount, conversations };
+    const stats: UserStats = {
+      sessionsCompleted,
+      streak,
+      vocabularyCount,
+      conversations,
+      promotions,
+    };
     const earnedCodes = ACHIEVEMENT_RULES.filter((r) => r.check(stats)).map((r) => r.code);
     if (earnedCodes.length === 0) return [];
 

@@ -631,6 +631,58 @@ model SentencePattern {
   @@map("sentence_patterns")
 }
 
+// ========================== Leitura paralela (4 idiomas) ==========================
+
+/**
+ * A MESMA historia, escrita nos quatro idiomas e alinhada frase a frase.
+ *
+ * Nao e uma tabela por idioma, pela mesma razao da `CanDoLesson`: o texto nao
+ * pertence a idioma nenhum -- ele existe no espaco entre os quatro. Quebra-lo
+ * em quatro linhas perderia o unico dado que importa, que e o de as quatro
+ * versoes serem a mesma historia, com a frase N dizendo a mesma coisa em todas.
+ *
+ * O aluno le primeiro no idioma mais forte. Quando o texto voltar em russo, ele
+ * ja sabe o que esta escrito ali, e e isso que o deixa ler acima do proprio
+ * nivel sem travar na terceira linha -- o mesmo andaime da revisao, aplicado a
+ * texto.
+ *
+ * Gerada fora do horario de estudo, como todo pool: sao quatro versoes numa
+ * resposta so, com cirilico dentro, e a funcao da Vercel morre aos 60s.
+ */
+model ReadingPassage {
+  id       String @id @default(uuid())
+  /**
+   * Id do texto no catalogo do codigo, ex.: "a-manha-atrasada".
+   */
+  topicId  String
+  /**
+   * O nivel-teto do texto: o MENOR nivel entre os idiomas do aluno, porque a
+   * mesma historia precisa ser legivel nos quatro. O que varia por idioma e o
+   * tamanho da frase, e isso vive dentro de `versions`.
+   */
+  level    String
+  /**
+   * O titulo em portugues, do catalogo. Cada versao traz o seu.
+   */
+  title    String
+  /**
+   * As quatro versoes: cada uma com titulo, frases (texto, romanizacao,
+   * traducao), glossario e perguntas de compreensao no proprio idioma.
+   */
+  versions Json
+  /**
+   * O paragrafo em portugues que compara os quatro idiomas neste texto.
+   */
+  contrast String
+
+  timesUsed  Int      @default(0)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([topicId, level])
+  @@map("reading_passages")
+}
+
 // ============================ Can-do (4 idiomas) ============================
 
 /**

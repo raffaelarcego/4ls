@@ -91,11 +91,14 @@ const ACTIVITY_THEMES: Record<string, ActivityTheme> = {
   grammar: { label: 'Gramática', blurb: 'Estrutura e formas' },
   listening: { label: 'Escuta', blurb: 'Diálogo falado + compreensão' },
   dictation: { label: 'Ditado', blurb: 'Ouvir e escrever' },
-  reading: { label: 'Leitura', blurb: 'Compreensão de texto' },
+  reading: { label: 'Leitura', blurb: 'A mesma história nos 4 idiomas' },
   speaking: { label: 'Fala', blurb: 'Falar e ser corrigido' },
   writing: { label: 'Escrita', blurb: 'Produzir texto seu' },
   tutor: { label: 'Tutor', blurb: 'Conversa corrigida' },
   assessment: { label: 'Avaliação', blurb: 'Medir o nível' },
+  // O único bloco que muda o nível do idioma. Não é planejado: aparece no
+  // painel quando o desempenho abre o portão, e é o aluno que decide encarar.
+  promotion: { label: 'Chefe de fase', blurb: 'O exame que sobe o nível' },
 };
 
 export function activityTheme(type: string): ActivityTheme {

@@ -16,6 +16,8 @@ import { DictationRunner } from './DictationRunner';
 import { FoundationRunner } from './FoundationRunner';
 import { ListeningRunner } from './ListeningRunner';
 import { ProductionRunner } from './ProductionRunner';
+import { PromotionRunner } from './PromotionRunner';
+import { ReadingRunner } from './ReadingRunner';
 import { SpeakingRunner } from './SpeakingRunner';
 import { StructureRunner } from './StructureRunner';
 import { VocabularyRunner } from './VocabularyRunner';
@@ -28,8 +30,15 @@ interface Exercise {
   explanation: string;
 }
 
-/** Tipos para os quais a IA consegue gerar exercicios objetivos e corrigiveis. */
-const EXERCISE_TYPES = new Set(['grammar', 'reading']);
+/**
+ * Tipos para os quais a IA consegue gerar exercicios objetivos e corrigiveis.
+ *
+ * `reading` saiu daqui: exercicio gerado era o que o bloco de leitura tinha no
+ * lugar de um texto, e cinco perguntas de multipla escolha sobre nada nao sao
+ * compreensao de leitura. Agora ele tem o `ReadingRunner`, com a mesma historia
+ * nos quatro idiomas.
+ */
+const EXERCISE_TYPES = new Set(['grammar']);
 
 export function GenericRunner({
   activity,
@@ -78,12 +87,24 @@ export function GenericRunner({
   if (activity.type === 'foundation') {
     return <FoundationRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
+  // O chefe de fase: o unico bloco com consequencia -- ele muda o nivel do
+  // idioma, que e o teto de todo o conteudo que o app serve. Nunca e planejado;
+  // chega aqui porque o aluno tocou no chefe no painel.
+  if (activity.type === 'promotion') {
+    return <PromotionRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
   // A prova do mes: o unico bloco que mede em vez de ensinar.
   if (activity.type === 'assessment') {
     return <AssessmentRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'structure') {
     return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // A mesma historia nos quatro idiomas, uma leitura por idioma. Quando o
+  // texto chega no idioma mais fraco, ele ja sabe o que esta escrito ali -- e e
+  // isso que o deixa ler acima do proprio nivel.
+  if (activity.type === 'reading') {
+    return <ReadingRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'listening') {
     return <ListeningRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;

@@ -165,6 +165,115 @@ export interface StructureLesson {
   attempts: number;
 }
 
+/** As tres rodadas do chefe de fase. */
+export type PromotionRound = 'sentences' | 'reading' | 'vocabulary';
+
+/**
+ * O estado do chefe num idioma.
+ *
+ * `reason` sempre diz o que FALTA, nunca apenas "bloqueado": o portao tem
+ * quatro motivos diferentes para estar fechado, e cada um pede uma ação
+ * diferente do aluno — esperar, estudar, ou nada (topo da escala).
+ */
+export interface PromotionGate {
+  state: 'ready' | 'growing' | 'cooldown' | 'unprepared' | 'maxed';
+  reason: string;
+  languageCode: string;
+  languageName: string;
+  currentLevel: string;
+  nextLevel: string | null;
+  missingScore: number;
+  availableAt: string | null;
+}
+
+/** Um item do exame. Com `scrambled` é montagem; com `options`, escolha. */
+export interface PromotionItem {
+  round: PromotionRound;
+  prompt: string;
+  scrambled?: string[];
+  options?: string[];
+  answer: string;
+  explanation?: string;
+}
+
+export interface PromotionExam {
+  languageCode: string;
+  languageName: string;
+  currentLevel: string;
+  nextLevel: string | null;
+  items: PromotionItem[];
+}
+
+export interface PromotionAttempt {
+  passed: boolean;
+  score: number;
+  rounds: Array<{ round: PromotionRound; correct: number; total: number }>;
+  from: string;
+  level: string;
+  /** A rodada que afundou. Vira o que treinar até o chefe reabrir. */
+  weakest: PromotionRound | null;
+}
+
+/** Uma frase do texto de leitura, na versao de um idioma. */
+export interface ReadingSentence {
+  text: string;
+  /** So em russo. */
+  romanization?: string | null;
+  /** A mesma frase em portugues, para quando ele travar. */
+  translation: string;
+}
+
+export interface ReadingQuestion {
+  prompt: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+}
+
+/** O texto num idioma: o que ele le, mais o que a tela precisa em volta. */
+export interface ReadingVersion {
+  languageCode: string;
+  title: string;
+  sentences: ReadingSentence[];
+  glossary?: Array<{ term: string; meaning: string }>;
+  questions: ReadingQuestion[];
+}
+
+/**
+ * A MESMA historia nos outros idiomas, alinhada por indice.
+ *
+ * A frase N daqui diz o que diz a frase N da versao que ele esta lendo -- e por
+ * isso que a tela consegue abrir qualquer frase e mostrar as outras tres. Vem
+ * so o texto: perguntas e glossario dos outros idiomas nao servem a nada aqui.
+ */
+export interface ReadingOtherVersion {
+  languageCode: string;
+  title: string;
+  sentences: Array<{ text: string; romanization?: string | null }>;
+}
+
+/** O texto de leitura do dia, num idioma, com as outras versoes junto. */
+export interface ReadingLesson {
+  passageId: string;
+  /** O titulo em portugues; o do idioma vem em `version.title`. */
+  title: string;
+  premise: string;
+  /** O que reparar enquanto le -- o ponto em que os quatro se separam. */
+  focus: string;
+  genre: string;
+  level: string;
+  languageCode: string;
+  languageName: string;
+  version: ReadingVersion;
+  others: ReadingOtherVersion[];
+  /**
+   * Em que idiomas ele JA leu esta historia. Saber que o conteudo e conhecido
+   * muda como se entra num texto que parecia impossivel.
+   */
+  alsoRead: string[];
+  contrast: string;
+}
+
 /**
  * Uma peca da frase presa a uma COLUNA da can-do -- e nao a um papel gramatical
  * do idioma. A coluna e a mesma nos quatro idiomas; o que muda de um para outro

@@ -33,6 +33,10 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   // nenhuma -- e o aluno pode sair dela com uma nota ruim, entao o XP precisa
   // compensar ter encarado.
   assessment: 35,
+  // O chefe de fase. O maior XP do produto, e ele nao paga o acerto -- paga
+  // ter encarado: o exame pode terminar em derrota, e um bloco que so recompensa
+  // quem vence ensina a nao tentar.
+  promotion: 60,
 };
 
 export const SESSION_COMPLETION_XP = 25;

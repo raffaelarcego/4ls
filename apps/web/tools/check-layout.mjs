@@ -161,6 +161,24 @@ const FIXTURES = {
   '/auth/me': user,
   '/dashboard': dashboard,
   '/study/today': dashboard.session,
+  /*
+   * O chefe de fase ABERTO, e nao um portao fechado: aberto ele desenha o card
+   * maior do painel -- personagem, dois niveis lado a lado e um botao de
+   * largura inteira --, e e esse estado que pode vazar num celular estreito. Um
+   * portao fechado devolveria uma linha de texto e nao mediria nada.
+   */
+  '/promotion/status': [
+    {
+      state: 'ready',
+      reason: 'Você está pronto para tentar o A2.',
+      languageCode: 'en',
+      languageName: 'English',
+      currentLevel: 'A1',
+      nextLevel: 'A2',
+      missingScore: 0,
+      availableAt: null,
+    },
+  ],
   '/languages': [
     { id: 'l-en', code: 'en', name: 'English' },
     { id: 'l-es', code: 'es', name: 'Español' },

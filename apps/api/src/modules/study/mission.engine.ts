@@ -90,6 +90,9 @@ const PILLAR_BY_TYPE: Record<string, Pillar> = {
   writing: Pillar.LIVE,
   tutor: Pillar.LIVE,
   assessment: Pillar.LEVEL_UP,
+  // O chefe de fase e literalmente subir de nivel. Ele nunca e planejado: entra
+  // so pela porta da pratica livre, quando o aluno decide encara-lo.
+  promotion: Pillar.LEVEL_UP,
 };
 
 /** Categorias de erro que puxam cada tipo de atividade para cima. */

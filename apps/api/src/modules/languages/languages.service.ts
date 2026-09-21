@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CefrLevel } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PROMOTION_SCORE } from '../promotion/promotion.rules';
 
 /** Pesos do nivel global CEFR -- nao e media simples, conforme a regra do produto. */
 const SKILL_WEIGHTS: Record<string, number> = {
@@ -81,7 +82,14 @@ export class LanguagesService {
   }
 }
 
-function compositeScore(skills: Record<string, number>): number {
+/**
+ * A nota composta do idioma.
+ *
+ * Exportada porque o chefe de fase decide por ela: e esta nota que ABRE o
+ * exame de promocao. Recalcula-la la com outros pesos faria a tela prometer um
+ * chefe que o portao nao abre.
+ */
+export function compositeScore(skills: Record<string, number>): number {
   return Object.entries(SKILL_WEIGHTS).reduce(
     (sum, [skill, weight]) => sum + (skills[skill] ?? 0) * weight,
     0,
@@ -90,11 +98,15 @@ function compositeScore(skills: Record<string, number>): number {
 
 /**
  * Sugere subir de nivel apenas quando a nota composta se sustenta alto.
- * A promocao continua sendo uma decisao explicita, nao automatica.
+ *
+ * Sugerir continua sendo tudo o que ela faz: quem promove e o chefe de fase, e
+ * a mesma nota que aparece aqui e a que abre o exame. O numero vem de
+ * `promotion.rules` para os dois nao divergirem -- com dois numeros soltos, a
+ * tela podia dizer "voce pode subir" com o chefe ainda trancado.
  */
 function suggestedLevel(current: CefrLevel, score: number): CefrLevel {
   const index = LEVEL_ORDER.indexOf(current);
-  if (score >= 85 && index < LEVEL_ORDER.length - 1) return LEVEL_ORDER[index + 1];
+  if (score >= PROMOTION_SCORE && index < LEVEL_ORDER.length - 1) return LEVEL_ORDER[index + 1];
   if (score < 30 && index > 0) return LEVEL_ORDER[index - 1];
   return current;
 }

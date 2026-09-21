@@ -16,6 +16,8 @@ import { GamificationModule } from './modules/gamification/gamification.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { HealthModule } from './modules/health/health.module';
 import { LanguagesModule } from './modules/languages/languages.module';
+import { PromotionModule } from './modules/promotion/promotion.module';
+import { ReadingModule } from './modules/reading/reading.module';
 import { ReferenceModule } from './modules/reference/reference.module';
 import { ReviewModule } from './modules/review/review.module';
 import { SpeechFeatureModule } from './modules/speech/speech.module';
@@ -40,6 +42,8 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     AssessmentModule,
     StructureModule,
     CanDoModule,
+    PromotionModule,
+    ReadingModule,
     ReferenceModule,
     ReviewModule,
     ErrorsModule,

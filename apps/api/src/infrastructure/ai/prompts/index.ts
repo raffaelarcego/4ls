@@ -887,6 +887,139 @@ Cada frase precisa das ${ctx.targets.length} realizacoes: "${codes}". Nenhuma po
 }
 
 // ---------------------------------------------------------------------------
+// Leitura paralela
+// ---------------------------------------------------------------------------
+
+export interface ReadingPassageTarget {
+  code: string;
+  name: string;
+  /** O nivel DESTE idioma. O texto e o mesmo; o tamanho da frase, nao. */
+  level: string;
+}
+
+export interface ReadingPassageContext {
+  /** O titulo em portugues. */
+  title: string;
+  /** O que acontece no texto, em portugues, com comeco meio e fim. */
+  premise: string;
+  /** O ponto em que os quatro idiomas se separam neste texto. */
+  focus: string;
+  /** historia | noticia | relato. Muda o registro. */
+  genre: string;
+  targets: ReadingPassageTarget[];
+}
+
+/**
+ * A MESMA historia, escrita nos quatro idiomas, alinhada frase a frase.
+ *
+ * Duas exigencias mandam neste prompt, e as duas sao estruturais -- nao sao
+ * preferencia de estilo:
+ *
+ * 1. MESMO NUMERO DE FRASES, MESMA ORDEM. A frase 3 do alemao diz o que diz a
+ *    frase 3 do ingles. E o que deixa a tela oferecer "como fica esta frase nos
+ *    outros tres?" em qualquer ponto do texto. Um idioma que junta duas frases
+ *    numa so quebra o alinhamento e a comparacao morre em silencio -- pior, ela
+ *    passa a mostrar frases que nao se correspondem, o que ensina errado.
+ *
+ * 2. O NIVEL E POR IDIOMA, A HISTORIA NAO. O ingles B2 recebe periodo composto
+ *    e o russo A1 recebe frase curta, contando o mesmo acontecimento. Simplificar
+ *    a HISTORIA para caber no idioma mais fraco desperdicaria a leitura nos
+ *    outros tres; simplificar so a FRASE e o que o nivel pede de verdade.
+ *
+ * As perguntas sao por idioma e de detalhe, de proposito. O aluno chega a
+ * terceira e a quarta leitura ja sabendo a historia -- e justamente esse o
+ * andaime --, entao pergunta de ideia geral ele acerta de memoria, sem ler.
+ * Perguntar o detalhe obriga a passar o olho no texto daquele idioma, que e o
+ * que o bloco mede.
+ */
+export function readingPassagePrompt(
+  ctx: ReadingPassageContext,
+  sentences: number,
+  questions: number,
+): string {
+  const languages = ctx.targets
+    .map((t) => `--- ${LANGUAGE_LABEL[t.code] ?? t.name} (${t.code}), nivel do aluno: ${t.level}`)
+    .join('\n');
+
+  const codes = ctx.targets.map((t) => t.code).join('", "');
+
+  return `Voce escreve o texto de leitura de um brasileiro que estuda ingles, espanhol, alemao e
+russo AO MESMO TEMPO. Ele fala portugues nativo.
+
+A exigencia central dele: ler A MESMA historia nos quatro idiomas, para ver como cada um
+conta a mesma coisa. Ele le primeiro no idioma mais forte e depois nos outros -- e por ja
+saber o que esta escrito que ele consegue ler acima do proprio nivel sem travar.
+
+TEXTO DE HOJE: ${ctx.title}
+FORMA: ${ctx.genre}
+O QUE ACONTECE (a historia, em portugues -- siga-a, nao invente outra):
+${ctx.premise}
+
+O QUE ESTE TEXTO MOSTRA: ${ctx.focus}
+
+OS IDIOMAS (cada um com o nivel do aluno naquele idioma):
+${languages}
+
+A REGRA QUE MANDA EM TODAS AS OUTRAS: cada versao tem EXATAMENTE ${sentences} frases, e a
+frase de numero N diz A MESMA COISA nas ${ctx.targets.length} versoes. Mesmo acontecimento, mesma ordem,
+mesmos nomes proprios. Nunca junte duas frases numa nem quebre uma em duas para o idioma
+ficar mais natural: escolha desde o inicio ${sentences} acontecimentos que caibam, cada um, numa
+frase em qualquer um dos ${ctx.targets.length} idiomas. O alinhamento e o que a tela usa para mostrar a
+mesma frase lado a lado -- sem ele, ela compara frases que nao se correspondem.
+
+Regras:
+- O NIVEL E POR IDIOMA, declarado acima. A mesma frase sai curta e direta no idioma de
+  nivel A1 e pode sair com oracao subordinada no de nivel B2. O que muda e a frase, NUNCA
+  a historia: os fatos, a ordem e os detalhes sao identicos nas ${ctx.targets.length} versoes.
+- Escreva como se escreve de verdade naquele idioma. Nao traduza palavra por palavra a
+  partir do portugues: se o idioma resolve aquilo com outra construcao, use a dele.
+- Nada de vocabulario muito acima do nivel daquele idioma. Uma palavra dificil por frase,
+  no maximo, e so quando a historia precisar dela.
+- Em russo escreva em cirilico e ponha a transliteracao em "romanization". Nos outros
+  idiomas "romanization" e null.
+- "translation" e a traducao daquela frase em portugues, usada quando ele travar. Traduza
+  o sentido, nao a forma.
+- "glossary": de 4 a 6 palavras DAQUELA versao que um brasileiro no nivel dele provavelmente
+  nao conhece, com o significado em portugues no contexto do texto. Palavras que estao no
+  texto, nunca sinonimos que nao aparecem.
+- "questions": ${questions} perguntas por idioma, escritas NAQUELE idioma, sobre DETALHES do texto
+  (quem fez o que, onde, quando, com quem, em que ordem). Nada de "qual e a ideia principal"
+  -- ele ja sabe a historia e acertaria sem ler. Cada pergunta com 3 alternativas, sendo
+  "answer" identica a uma das "options". A explicacao vai em portugues e diz em que frase
+  do texto a resposta esta.
+- "contrast" e um paragrafo curto em portugues (3 a 5 frases) sobre ${ctx.focus} nas
+  ${ctx.targets.length} linguas deste texto, citando frases dele. Fale das quatro, nao de uma.
+
+Responda APENAS com JSON valido, sem nenhum texto fora dele:
+{
+  "versions": [
+    {
+      "languageCode": "${ctx.targets[0]?.code ?? 'en'}",
+      "title": "o titulo neste idioma",
+      "sentences": [
+        {
+          "text": "a frase neste idioma",
+          "romanization": "so em russo; null nos outros",
+          "translation": "a mesma frase em portugues"
+        }
+      ],
+      "glossary": [{ "term": "palavra do texto", "meaning": "significado em portugues" }],
+      "questions": [
+        {
+          "prompt": "a pergunta neste idioma",
+          "options": ["a", "b", "c"],
+          "answer": "a alternativa correta, identica a uma das options",
+          "explanation": "em portugues, dizendo em que frase esta a resposta"
+        }
+      ]
+    }
+  ],
+  "contrast": "o paragrafo em portugues comparando os ${ctx.targets.length} idiomas"
+}
+Cada versao precisa das ${sentences} frases, e todas as ${ctx.targets.length} versoes precisam existir: "${codes}".`;
+}
+
+// ---------------------------------------------------------------------------
 // Captura de texto
 // ---------------------------------------------------------------------------
 

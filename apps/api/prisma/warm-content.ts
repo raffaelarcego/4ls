@@ -5,6 +5,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/infrastructure/database/prisma.service';
 import { StructureService } from '../src/modules/structure/structure.service';
 import { CanDoService } from '../src/modules/cando/can-do.service';
+import { ReadingService } from '../src/modules/reading/reading.service';
 
 /**
  * Prepara o conteudo de estudo ANTES da hora do estudo.
@@ -50,6 +51,7 @@ async function main() {
   const prisma = app.get(PrismaService);
   const structure = app.get(StructureService);
   const cando = app.get(CanDoService);
+  const reading = app.get(ReadingService);
 
   const users = await prisma.user.findMany({
     where: onlyEmail ? { email: onlyEmail } : undefined,
@@ -116,6 +118,32 @@ async function main() {
     } catch (error) {
       failures += 1;
       logger.error(`${user.email} / can-do: ${(error as Error).message}`);
+    }
+
+    /*
+     * O texto de leitura segue a can-do, e pela mesma razao: ele e o MESMO nos
+     * quatro idiomas, entao nao pertence a nenhum e sai de uma geracao so.
+     *
+     * `target` nao entra aqui de proposito. Nos outros blocos ele e o tamanho
+     * do pool -- quantas aulas diferentes do mesmo assunto manter para o aluno
+     * nao decorar os exemplos. Na leitura isso seria trabalhar contra o modulo:
+     * ele existe justamente para o MESMO texto voltar depois em outro idioma. A
+     * variedade vem do catalogo, e o `warm` prepara o proximo texto de cada
+     * idioma, sem repetir os que ja estao prontos.
+     */
+    const startedReading = Date.now();
+    try {
+      const created = await reading.warm(user.id);
+      generated += created;
+      const seconds = Math.round((Date.now() - startedReading) / 1000);
+      logger.log(
+        created > 0
+          ? `${user.email} / leitura: ${created} texto(s) nos 4 idiomas em ${seconds}s.`
+          : `${user.email} / leitura: textos ja preparados.`,
+      );
+    } catch (error) {
+      failures += 1;
+      logger.error(`${user.email} / leitura: ${(error as Error).message}`);
     }
   }
 
