@@ -8,6 +8,7 @@ import { GamificationService } from '../gamification/gamification.service';
 import { SESSION_COMPLETION_XP, xpForActivity } from '../gamification/xp.rules';
 import { ReviewService } from '../review/review.service';
 import { AlphabetService } from '../alphabet/alphabet.service';
+import { AssessmentService } from '../assessment/assessment.service';
 import { FoundationService } from '../foundation/foundation.service';
 import {
   dailyTypesFor,
@@ -40,6 +41,7 @@ export class StudyService {
     private readonly ai: AiRouterService,
     private readonly alphabet: AlphabetService,
     private readonly foundation: FoundationService,
+    private readonly assessment: AssessmentService,
   ) {}
 
   /**
@@ -67,6 +69,7 @@ export class StudyService {
     languages: LanguageState[];
     totalMinutes: number;
     includeProduction: boolean;
+    includeAssessment: boolean;
   }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -119,6 +122,7 @@ export class StudyService {
       languages,
       totalMinutes: user.dailyMinutes,
       includeProduction: await this.productionIsDue(userId),
+      includeAssessment: await this.assessment.isDue(userId),
     };
   }
 
@@ -144,9 +148,10 @@ export class StudyService {
   }
 
   private async createSession(userId: string, useAi: boolean) {
-    const { languages, totalMinutes, includeProduction } = await this.collectState(userId);
+    const { languages, totalMinutes, includeProduction, includeAssessment } =
+      await this.collectState(userId);
 
-    let plan = planSession(languages, totalMinutes, { includeProduction });
+    let plan = planSession(languages, totalMinutes, { includeProduction, includeAssessment });
 
     // A IA e refinamento opcional: se falhar, seguimos com o plano deterministico.
     if (useAi && this.ai.hasProvider()) {
@@ -540,6 +545,10 @@ const SKILL_FIELD_BY_TYPE: Record<string, string> = {
   // Decodificar letra a som e leitura -- mesma competencia que o motor usa para
   // ranquear o bloco.
   alphabet: 'reading',
+  // A prova ja grava a nota por idioma e ja move a competencia com peso
+  // proprio (ver AssessmentService.record). Deixa-la tambem passar por aqui
+  // aplicaria o ajuste duas vezes, e a segunda com peso de bloco comum --
+  // diluindo justamente a unica medida objetiva do sistema.
   // Montar a frase com as primeiras pecas e gramatica, como estrutura -- e o
   // mesmo campo que o mission engine usa para ranquear os dois.
   foundation: 'grammar',

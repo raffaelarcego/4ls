@@ -27,7 +27,14 @@ const VIEWPORTS = [
   { name: 'iPhone 14', width: 390, height: 844 },
 ];
 
-const ROUTES = ['/', '/vocabulario', '/estruturas', '/progresso'];
+const ROUTES = [
+  '/',
+  '/vocabulario',
+  '/estruturas',
+  '/base/consulta',
+  '/base/tutor',
+  '/base/progresso',
+];
 
 const user = { id: 'u1', name: 'Raffael', email: 'raffael@example.com' };
 
@@ -113,14 +120,106 @@ const dashboard = {
   aiEnabled: true,
 };
 
+/**
+ * A consulta e a tela mais propensa a vazar de lado: ela mostra letras
+ * grandes, transliteracao e uma nota de armadilha longa lado a lado.
+ */
+const reference = {
+  languageCode: 'ru',
+  title: 'Alfabeto cirílico',
+  intro: 'As 33 letras, na ordem em que as armadilhas aparecem — não de А a Я.',
+  sortable: true,
+  sections: [
+    {
+      id: 'ru-alfa-2',
+      title: 'As três que enganam',
+      note: 'Parar de ler Н como "h" e Р como "p" — os dois enganos mais caros do começo.',
+      mastery: 62,
+      entries: [
+        {
+          symbol: 'Р р',
+          name: 'er',
+          sound: 'r de "caro", vibrado com a ponta da língua',
+          example: 'рот',
+          exampleMeaning: 'boca',
+          exampleReading: 'rot',
+          trap: 'Parece o P latino, mas é R. "рот" é "rot" (boca), nunca "pot".',
+        },
+      ],
+    },
+  ],
+  all: [],
+};
+reference.all = reference.sections.flatMap((s) => s.entries);
+
 const FIXTURES = {
+  '/reference/languages': [
+    { code: 'ru', name: 'Русский', title: 'Alfabeto cirílico' },
+    { code: 'de', name: 'Deutsch', title: 'Como se lê o alemão' },
+  ],
+  '/reference': reference,
   '/auth/me': user,
   '/dashboard': dashboard,
   '/study/today': dashboard.session,
+  '/languages': [
+    { id: 'l-en', code: 'en', name: 'English' },
+    { id: 'l-es', code: 'es', name: 'Español' },
+    { id: 'l-de', code: 'de', name: 'Deutsch' },
+    { id: 'l-ru', code: 'ru', name: 'Русский' },
+  ],
+  '/analytics/time': [
+    { date: '2026-09-15', hours: 1.0, languageCode: 'en' },
+    { date: '2026-09-16', hours: 0.8, languageCode: 'de' },
+  ],
+  '/analytics/consistency': { percentage: 78, activeDays: 22, days: 28 },
+  // `languages` e obrigatorio: a tela faz `weekly.data.languages.map` sem guarda.
+  '/analytics/weekly-review': {
+    totalHours: 6.5,
+    sessionsCompleted: 6,
+    xpEarned: 1240,
+    languages: [
+      { code: 'en', name: 'English', hours: 2.1, xp: 420 },
+      { code: 'de', name: 'Deutsch', hours: 1.6, xp: 380 },
+    ],
+  },
+  // `estimatedCost` e obrigatorio: a tabela chama `.toFixed(4)` direto nele.
+  '/analytics/ai-usage': [
+    { task: 'plan.create', calls: 12, tokens: 4200, estimatedCost: 0.0123 },
+  ],
+  // Idem para `topPlayed`.
+  '/speech/cache': {
+    entries: 3,
+    bytes: 128000,
+    topPlayed: [{ text: 'рот', languageCode: 'ru', plays: 9 }],
+  },
+  // Envelopado em `topics` -- a tela le `data.topics`, nao a lista crua.
+  '/grammar/topics': {
+    topics: [
+      {
+        id: 't1',
+        title: 'O verbo em segunda posição',
+        summary:
+          'Quando a frase começa por outra coisa, o sujeito cai para depois do verbo.',
+        mastery: 45,
+        flagged: false,
+        attempts: 8,
+      },
+    ],
+  },
+  // O painel de interferencia da tela de Estruturas.
+  '/errors/interference': [
+    {
+      id: 'i1',
+      from: { code: 'es', name: 'Español' },
+      to: { code: 'pt', name: 'Português' },
+      categories: ['FALSE_COGNATE', 'WORD_ORDER'],
+      occurrences: 5,
+      topics: [{ id: 't1', title: 'Ser e estar' }],
+    },
+  ],
   '/review/due': [],
   '/vocabulary': { items: [], total: 0 },
   '/concepts/lesson': [],
-  '/grammar/topics': [],
   '/analytics/overview': {},
 };
 
@@ -163,7 +262,20 @@ for (const viewport of VIEWPORTS) {
 
   const page = await context.newPage();
 
+  /*
+   * Erro de pagina invalida a medida.
+   *
+   * Uma tela que quebrou renderiza vazio, e vazio nao vaza para os lados --
+   * entao ela passava. Foi o que aconteceu com o tutor e o progresso: os dois
+   * estouravam num `.map` sobre uma fixture errada e o medidor dava visto nos
+   * dois. Medidor que aprova tela quebrada e pior que medidor nenhum, porque
+   * da confianca falsa.
+   */
+  const crashes = [];
+  page.on('pageerror', (error) => crashes.push(String(error).slice(0, 160)));
+
   for (const path of ROUTES) {
+    crashes.length = 0;
     await page.goto(`${base}${path}`, { waitUntil: 'networkidle' });
     // Uma batida de animacao, para o halo e o sprite assentarem antes da medida.
     await page.waitForTimeout(400);
@@ -207,6 +319,7 @@ for (const viewport of VIEWPORTS) {
       return {
         scrollWidth: doc.scrollWidth,
         clientWidth: doc.clientWidth,
+        text: document.body.innerText.trim().length,
         // So os mais externos interessam: um pai que vaza arrasta os filhos.
         offenders: offenders.slice(0, 5),
       };
@@ -214,11 +327,19 @@ for (const viewport of VIEWPORTS) {
 
     const scrolls = result.scrollWidth > result.clientWidth;
     const leaks = result.offenders.length > 0;
+    // Tela praticamente sem texto e tela que nao renderizou. O piso e baixo de
+    // proposito: qualquer pagina real do app passa de 40 caracteres.
+    const blank = result.text < 40;
+    const broke = crashes.length > 0;
 
-    if (scrolls || leaks) {
+    if (scrolls || leaks || blank || broke) {
       failures.push({ viewport: viewport.name, path, ...result });
       console.log(`\n✗ ${viewport.name} (${viewport.width}px) ${path}`);
-      console.log(`  scrollWidth ${result.scrollWidth} > clientWidth ${result.clientWidth}`);
+      if (broke) console.log(`  QUEBROU: ${crashes[0]}`);
+      if (blank) console.log(`  EM BRANCO: só ${result.text} caracteres na tela`);
+      if (scrolls) {
+        console.log(`  scrollWidth ${result.scrollWidth} > clientWidth ${result.clientWidth}`);
+      }
       for (const o of result.offenders) {
         console.log(`  ${o.left}..${o.right}  <${o.tag} class="${o.cls}">`);
       }
@@ -234,7 +355,7 @@ await browser.close();
 await server.close();
 
 if (failures.length > 0) {
-  console.log(`\n${failures.length} tela(s) vazando para os lados.`);
+  console.log(`\n${failures.length} tela(s) com problema.`);
   process.exit(1);
 }
-console.log('\nNenhum vazamento horizontal.');
+console.log('\nTodas as telas renderizam, e nenhuma vaza para os lados.');

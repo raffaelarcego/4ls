@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "vercel-build": "npm run build",
     "preview": "vite preview",
-    "check:layout": "node tools/check-layout.mjs"
+    "check:layout": "node tools/check-layout.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.69.0",

@@ -335,6 +335,11 @@ export interface FoundationLesson {
   review: FoundationPiece[];
   mastery: number;
   complete: boolean;
+  /**
+   * `learn` = lição nova, com peças e frases antes do treino.
+   * `review` = lição já vencida voltando; a tela abre direto no treino.
+   */
+  mode: 'learn' | 'review';
 }
 
 /** A mesma coisa num idioma que o aluno ja domina, para servir de dica. */
@@ -413,4 +418,67 @@ export interface ReviewItem {
   conceptId: string | null;
   /** Presente so quando o significado ja firmou e a forma deste idioma nao. */
   scaffold: Scaffold | null;
+}
+
+/** Um item da prova mensal: uma frase para remontar num idioma. */
+export interface AssessmentItem {
+  canDoId: string;
+  languageCode: string;
+  /** O que dizer, em português. */
+  gloss: string;
+  /** A frase certa, revelada depois da resposta. */
+  sentence: string;
+  /** Os pedaços na ordem CERTA — quem embaralha é a tela. */
+  parts: Array<{ text: string; column: string }>;
+}
+
+/**
+ * A prova do mês.
+ *
+ * Vem vazia quando não há material com três semanas de descanso, e isso é
+ * estado normal, não erro: é o que acontece com quem começou há pouco.
+ */
+export interface AssessmentExam {
+  items: AssessmentItem[];
+  questions: Array<{ canDoId: string; question: string }>;
+}
+
+/** Uma entrada da tabela de consulta: uma letra, um dígrafo, uma combinação. */
+export interface ReferenceEntry {
+  symbol: string;
+  name?: string;
+  /** O som, ancorado numa palavra portuguesa. */
+  sound: string;
+  example?: string;
+  exampleMeaning?: string;
+  exampleReading?: string;
+  /** O engano provável. Só quem parece outra coisa tem. */
+  trap?: string;
+}
+
+export interface ReferenceSection {
+  id: string;
+  title: string;
+  note?: string;
+  entries: ReferenceEntry[];
+  /** 0-100 quando a seção é uma lição da trilha; null quando é só regra. */
+  mastery: number | null;
+}
+
+/** O material de consulta de um idioma. Não pontua e não entra na sessão. */
+export interface Reference {
+  languageCode: string;
+  title: string;
+  intro: string;
+  sections: ReferenceSection[];
+  /** Vale oferecer ordem alfabética? Alfabeto sim, regra de leitura não. */
+  sortable: boolean;
+  /** Tudo numa lista só, para busca e ordenação. */
+  all: ReferenceEntry[];
+}
+
+export interface ReferenceLanguage {
+  code: string;
+  name: string;
+  title: string;
 }

@@ -249,7 +249,7 @@ export function SessionPage() {
 }
 
 /** Tipos cujo conteudo vale para os quatro idiomas, nao para o dono nominal. */
-const CROSS_LANGUAGE_TYPES = new Set(['contrast', 'compare', 'production']);
+const CROSS_LANGUAGE_TYPES = new Set(['contrast', 'compare', 'production', 'assessment']);
 
 /** Sessao roda em tela cheia, sem a navegacao do app: um bloco por vez. */
 function Shell({ header, children }: { header?: React.ReactNode; children: React.ReactNode }) {

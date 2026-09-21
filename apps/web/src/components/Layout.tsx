@@ -6,15 +6,22 @@ import { useBottomBanner } from '../lib/pwa';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth.store';
 import { DashboardData, LevelProgress } from '../types';
-import { CardsIcon, ChartIcon, ChatIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
+import { BaseIcon, CardsIcon, HomeIcon, LogoutIcon, PuzzleIcon } from './Icons';
 import { InstallButton, InstallPrompt } from './InstallPrompt';
 
 const NAV = [
   { to: '/', label: 'Aprender', Icon: HomeIcon },
   { to: '/vocabulario', label: 'Palavras', Icon: CardsIcon },
   { to: '/estruturas', label: 'Estruturas', Icon: PuzzleIcon },
-  { to: '/tutor', label: 'Tutor', Icon: ChatIcon },
-  { to: '/progresso', label: 'Progresso', Icon: ChartIcon },
+  /*
+   * Consulta, tutor e progresso cabiam como tres abas e o rodape ficava com
+   * seis -- "Estruturas" e "Progresso" ja ocupavam quase a celula inteira em
+   * 360px, e a setima quebraria a barra em duas linhas.
+   *
+   * Elas viraram a Base, e o agrupamento nao e so economia de espaco: as tres
+   * sao o que o aluno faz ENTRE as missoes, nao durante.
+   */
+  { to: '/base', label: 'Base', Icon: BaseIcon },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -110,8 +117,7 @@ export function Layout({ children }: { children: ReactNode }) {
               relance em qualquer tela. As duas primeiras estavam rotuladas como
               "min. hoje" e "min. no total", o que era simplesmente errado: o
               campo sempre foi XP, nunca minuto.
-            */}
-            {/*
+
               Tres indicadores nao cabem num aparelho de 360px -- por isso o
               terceiro so aparece a partir do `sm`, que e a mesma defesa que o
               cabecalho ja usava antes. Sequencia e nivel ficam sempre: sao os

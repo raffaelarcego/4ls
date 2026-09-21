@@ -4,6 +4,7 @@ import { AnswerOption } from '../../components/AnswerOption';
 import { AudioButton } from '../../components/AudioButton';
 import { LessonFooter, SkipButton } from '../../components/LessonFooter';
 import { ProgressBar } from '../../components/ProgressBar';
+import { SentenceBuilder } from '../../components/SentenceBuilder';
 import { api, errorMessage } from '../../services/api';
 import {
   FoundationLesson,
@@ -42,7 +43,7 @@ export function FoundationRunner({
   onFinish: (score: number) => void;
   onSkip: () => void;
 }) {
-  const [phase, setPhase] = useState<'pieces' | 'sentences' | 'drills'>('pieces');
+  const [phase, setPhase] = useState<'pieces' | 'sentences' | 'drills' | null>(null);
 
   const lesson = useQuery<FoundationLesson>({
     queryKey: ['foundation', 'lesson', activity.languageCode],
@@ -83,11 +84,30 @@ export function FoundationRunner({
     );
   }
 
-  if (phase === 'drills') {
-    return <Practice lesson={lesson.data} onFinish={onFinish} onSkip={onSkip} />;
+  /*
+   * A fase inicial depende do modo, e por isso ela so e decidida DEPOIS de a
+   * licao chegar -- dai o `null` como estado inicial.
+   *
+   * Numa revisao a tela abre direto no treino: reapresentar as pecas e as
+   * frases de uma licao que ja esta em 80% e pedir ao aluno que releia o que
+   * ele sabe antes de provar que sabe, e esse e o caminho mais curto para ele
+   * passar a pular o bloco. Ele ainda pode voltar as pecas pelo rodape se
+   * travar em alguma.
+   */
+  const current = phase ?? (lesson.data.mode === 'review' ? 'drills' : 'pieces');
+
+  if (current === 'drills') {
+    return (
+      <Practice
+        lesson={lesson.data}
+        onFinish={onFinish}
+        onSkip={onSkip}
+        onBack={() => setPhase('pieces')}
+      />
+    );
   }
 
-  if (phase === 'sentences') {
+  if (current === 'sentences') {
     return (
       <Sentences
         lesson={lesson.data}
@@ -510,11 +530,15 @@ function Practice({
   lesson,
   onFinish,
   onSkip,
+  onBack,
 }: {
   lesson: FoundationLesson;
   onFinish: (score: number) => void;
   onSkip: () => void;
+  /** Volta as pecas. Na revisao e a unica porta para reler a licao. */
+  onBack: () => void;
 }) {
+  const isReview = lesson.mode === 'review';
   const drills = useMemo(() => buildDrills(lesson), [lesson]);
   const [index, setIndex] = useState(0);
   const [result, setResult] = useState<boolean | null>(null);
@@ -563,8 +587,12 @@ function Practice({
           <p className="font-serif text-lg font-semibold text-eel">frases e peças certas</p>
           <p className="max-w-sm text-sm text-wolf">
             {score >= 75
-              ? 'Estas peças já podem aparecer em frases novas.'
-              : 'Esta lição volta amanhã, antes de qualquer peça nova.'}
+              ? isReview
+                ? 'Continua firme. Ela volta daqui a uns dez dias.'
+                : 'Estas peças já podem aparecer em frases novas.'
+              : isReview
+                ? 'Esta lição escorregou — ela volta inteira amanhã, com as peças.'
+                : 'Esta lição volta amanhã, antes de qualquer peça nova.'}
           </p>
         </div>
         <LessonFooter tone={score >= 75 ? 'correct' : 'neutral'} title={`${score}% de acerto`}>
@@ -593,6 +621,17 @@ function Practice({
   return (
     <>
       <div className="space-y-4">
+        {isReview && (
+          <div>
+            <p className="font-mono text-xs text-hare">
+              Revisão · Fundamentos, lição {lesson.index} de {lesson.total}
+            </p>
+            <h2 className="font-serif text-xl font-semibold leading-tight text-eel">
+              {lesson.title}
+            </h2>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <ProgressBar value={index} max={drills.length} size="sm" tone="bg-macaw" />
           <span className="shrink-0 font-mono text-xs text-hare">
@@ -601,12 +640,18 @@ function Practice({
         </div>
 
         {drill.kind === 'build' ? (
-          <BuildExercise
+          <SentenceBuilder
             key={drill.id}
-            drill={drill}
+            prompt={drill.meaning}
+            chunks={drill.chunks.map((c) => ({ text: c.chunk, label: c.label }))}
+            answer={drill.answer}
             languageCode={lesson.languageCode}
             answered={result !== null}
             onAnswer={setResult}
+            // Aqui os rotulos FICAM: nos Fundamentos o exercicio ensina qual
+            // papel ocupa qual posicao. Na prova mensal eles somem, porque la
+            // ele mede.
+            showLabels
           />
         ) : (
           <ChoiceExercise
@@ -631,7 +676,15 @@ function Practice({
         </LessonFooter>
       ) : (
         <LessonFooter>
-          <SkipButton onSkip={onSkip} />
+          {/* Na revisao a tela abriu direto no treino, entao esta e a unica
+              porta para rever as pecas de quem travou numa delas. */}
+          {isReview ? (
+            <button className="btn-plain" onClick={onBack}>
+              Ver peças
+            </button>
+          ) : (
+            <SkipButton onSkip={onSkip} />
+          )}
         </LessonFooter>
       )}
     </>
@@ -696,100 +749,6 @@ function ChoiceExercise({
           );
         })}
       </div>
-    </>
-  );
-}
-
-/**
- * Montar a frase.
- *
- * Os pedacos carregam o rotulo (QUEM, SER, ONDE) tanto na bandeja quanto na
- * linha montada, e isso e deliberado: a aula nao e adivinhar qual palavra vem
- * primeiro, e ver que NESTE idioma o papel "SER" ocupa aquela posicao. Esconder
- * o rotulo transformaria o exercicio num quebra-cabeca de memoria da tela
- * anterior.
- */
-function BuildExercise({
-  drill,
-  languageCode,
-  answered,
-  onAnswer,
-}: {
-  drill: BuildDrill;
-  languageCode: string;
-  answered: boolean;
-  onAnswer: (correct: boolean) => void;
-}) {
-  const [placed, setPlaced] = useState<number[]>([]);
-  const available = drill.chunks.map((_, i) => i).filter((i) => !placed.includes(i));
-  const complete = placed.length === drill.chunks.length;
-
-  return (
-    <>
-      <div className="space-y-2">
-        <p className="font-serif text-lg font-semibold leading-snug text-eel">Monte a frase:</p>
-        <p className="font-serif text-xl leading-snug text-macaw-dark">{drill.meaning}</p>
-      </div>
-
-      {/* A linha montada. Altura minima para a tela nao pular a cada toque. */}
-      <div className="flex min-h-[5rem] flex-wrap items-end gap-2 rounded-md border border-swan bg-snow p-3">
-        {placed.length === 0 && (
-          <p className="self-center text-sm text-hare">Toque nas peças abaixo, na ordem.</p>
-        )}
-        {placed.map((chunkIndex, position) => {
-          const part = drill.chunks[chunkIndex];
-          return (
-            <button
-              key={`${chunkIndex}-${position}`}
-              type="button"
-              disabled={answered}
-              onClick={() => setPlaced((p) => p.filter((_, i) => i !== position))}
-              className="rounded-md border border-macaw bg-white px-3 py-1.5 text-left"
-            >
-              <span className="block font-mono text-[10px] uppercase leading-tight text-hare">
-                {part.label}
-              </span>
-              <span lang={languageCode} className="block font-serif text-xl text-eel">
-                {part.chunk}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {available.map((chunkIndex) => {
-          const part = drill.chunks[chunkIndex];
-          return (
-            <button
-              key={chunkIndex}
-              type="button"
-              disabled={answered}
-              onClick={() => setPlaced((p) => [...p, chunkIndex])}
-              className="tap-target rounded-md border border-swan bg-white px-3 py-2 text-left transition-colors"
-            >
-              <span className="block font-mono text-[10px] uppercase leading-tight text-hare">
-                {part.label}
-              </span>
-              <span lang={languageCode} className="block font-serif text-xl text-eel">
-                {part.chunk}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {!answered && (
-        <button
-          className="btn-primary w-full py-3"
-          disabled={!complete}
-          onClick={() =>
-            onAnswer(placed.map((i) => drill.chunks[i].chunk).join(' ') === drill.answer)
-          }
-        >
-          {complete ? 'Verificar' : 'Use todas as peças'}
-        </button>
-      )}
     </>
   );
 }

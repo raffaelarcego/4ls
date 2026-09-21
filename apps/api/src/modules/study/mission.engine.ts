@@ -243,10 +243,28 @@ const PRODUCTION_MINUTES = 8;
 const CONTRAST_MINUTES = 5;
 const COMPARE_MINUTES = 4;
 
+/**
+ * Minutos da avaliacao periodica.
+ *
+ * Ela ABRE o dia, antes ate do contraste, e isso nao e ordem de conveniencia:
+ * a prova cobra material com tres semanas de descanso, e servi-la depois da
+ * aula de hoje deixaria o conteudo recem-visto vazar para a medida. Medir
+ * primeiro, ensinar depois.
+ */
+const ASSESSMENT_MINUTES = 6;
+
 /** Tipos que atravessam os idiomas e por isso ficam fora do ranqueamento. */
 const CROSS_LANGUAGE_TYPES = ['contrast', 'compare'] as const;
 
 export interface PlanOptions {
+  /**
+   * Inclui a avaliacao periodica nesta sessao.
+   *
+   * Quem decide e o StudyService: mensal, e so quando existe material
+   * descansado o bastante para cobrar. Prova que abre vazia ensina o aluno a
+   * pular a proxima.
+   */
+  includeAssessment?: boolean;
   /**
    * Inclui o bloco de producao quadrupla nesta sessao.
    *
@@ -266,12 +284,33 @@ export function planSession(
   const highlights: string[] = [];
 
   /*
+   * A prova sai do total antes de qualquer divisao, como a producao e a
+   * moldura: ela nao pertence a idioma nenhum -- cobra os quatro de uma vez.
+   */
+  const assessment =
+    options.includeAssessment && languages.length >= 2 && totalMinutes >= ASSESSMENT_MINUTES * 3
+      ? ASSESSMENT_MINUTES
+      : 0;
+
+  if (assessment > 0) {
+    activities.push({
+      languageCode: languages[0].code,
+      pillar: PILLAR_BY_TYPE.assessment,
+      type: 'assessment',
+      plannedMinutes: assessment,
+      reason: DAILY_REASON.assessment,
+    });
+  }
+
+  /*
    * A producao atravessa os idiomas, entao ela sai do total ANTES da divisao
    * por idioma -- nao pertence a nenhum deles. O idioma prioritario entra so
    * como dono nominal do bloco, porque toda atividade precisa de um.
    */
   const production =
-    options.includeProduction && languages.length >= 2 && totalMinutes >= PRODUCTION_MINUTES * 2
+    options.includeProduction &&
+    languages.length >= 2 &&
+    totalMinutes - assessment >= PRODUCTION_MINUTES * 2
       ? Math.min(PRODUCTION_MINUTES, Math.floor(totalMinutes * 0.2))
       : 0;
 
@@ -285,11 +324,12 @@ export function planSession(
    * nao estudou.
    */
   const frame =
-    languages.length >= 2 && totalMinutes - production >= (CONTRAST_MINUTES + COMPARE_MINUTES) * 3
+    languages.length >= 2 &&
+    totalMinutes - production - assessment >= (CONTRAST_MINUTES + COMPARE_MINUTES) * 3
       ? CONTRAST_MINUTES + COMPARE_MINUTES
       : 0;
 
-  const budget = totalMinutes - production - frame;
+  const budget = totalMinutes - production - frame - assessment;
 
   if (frame > 0) {
     // Dono nominal: `languageCode` nao aceita nulo, e a convencao ja usada pela
@@ -501,6 +541,8 @@ const DAILY_REASON: Record<string, string> = {
   foundation:
     'As primeiras peças da frase, do zero. Sem elas, toda aula depois soa como língua estrangeira sobre língua estrangeira.',
   vocabulary: 'Os conceitos de hoje, os mesmos que voce ve nos outros idiomas.',
+  assessment:
+    'Prova do mês: funções que você aprendeu há três semanas ou mais, sem dica e sem autoavaliação. É a única medida do app que não depende da sua opinião.',
 };
 
 interface RankedType {

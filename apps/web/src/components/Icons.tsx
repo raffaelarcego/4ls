@@ -45,6 +45,34 @@ export function PuzzleIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Bussola: o acampamento-base.
+ *
+ * A primeira tentativa foi uma barraca, e em 20px ela virava o triangulo de
+ * AVISO -- um triangulo com um risco no meio le como erro, nao como lugar. A
+ * bussola tem silhueta redonda, que nenhum outro icone da barra usa, entao ela
+ * se distingue de relance mesmo pequena.
+ */
+export function BaseIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5 13.5 13.5 8.5 15.5 10.5 10.5Z" />
+    </svg>
+  );
+}
+
+/** Livro aberto: a aba de consulta. Tabela na parede, nao aula. */
+export function BookIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M12 6.5C10.5 5 8.5 4.5 6 4.5H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2c2.5 0 4.5.5 6 2" />
+      <path d="M12 6.5C13.5 5 15.5 4.5 18 4.5h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2c-2.5 0-4.5.5-6 2" />
+      <path d="M12 6.5v14" />
+    </svg>
+  );
+}
+
 export function ChatIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>

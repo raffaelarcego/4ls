@@ -28,6 +28,11 @@ export const XP_BY_ACTIVITY: Record<string, number> = {
   // sem nenhuma alternativa na tela. O XP reconhece isso.
   production: 40,
   tutor: 50,
+  // A prova mensal. Vale mais que um bloco de treino e menos que o tutor: ela
+  // e curta, mas e a unica que cobra material de tres semanas atras sem dica
+  // nenhuma -- e o aluno pode sair dela com uma nota ruim, entao o XP precisa
+  // compensar ter encarado.
+  assessment: 35,
 };
 
 export const SESSION_COMPLETION_XP = 25;

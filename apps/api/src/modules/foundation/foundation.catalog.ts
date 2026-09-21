@@ -552,6 +552,179 @@ export const FOUNDATION_TRACKS: Record<string, FoundationLesson[]> = {
         },
       ],
     },
+    {
+      id: 'de-fund-9',
+      title: 'Querer e poder: o verbo vai para o fim',
+      goal: 'Dizer o que você quer, pode ou precisa fazer.',
+      rule: 'Com um modal (querer, poder, precisar), o verbo principal NÃO fica ao lado dele: vai para o FIM da frase, na forma de dicionário. A frase abre com o modal e fecha com a ação, e todo o resto fica espremido no meio.',
+      pieces: [
+        { term: 'ich möchte', meaning: 'eu quero, eu gostaria', reading: 'ish MÖSH-te', note: 'A forma educada de pedir. É com ela que se pede num balcão.' },
+        { term: 'ich kann', meaning: 'eu posso, eu consigo', reading: 'ish kan' },
+        { term: 'du kannst', meaning: 'você pode', reading: 'du kanst' },
+        { term: 'ich muss', meaning: 'eu preciso, eu tenho que', reading: 'ish mus' },
+        { term: 'trinken', meaning: 'beber', reading: 'TRIN-ken', note: 'Forma de dicionário — e é exatamente assim que ela aparece no fim da frase.' },
+        { term: 'Kaffee', meaning: 'café', reading: 'KA-fê' },
+      ],
+      sentences: [
+        {
+          text: 'Ich möchte Kaffee trinken.',
+          reading: 'ish MÖSH-te KA-fê TRIN-ken',
+          meaning: 'Eu quero beber café.',
+          parts: [
+            { chunk: 'Ich', label: 'QUEM' },
+            { chunk: 'möchte', label: 'MODAL' },
+            { chunk: 'Kaffee', label: 'O QUÊ' },
+            { chunk: 'trinken', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Ich kann hier arbeiten.',
+          reading: 'ish kan rír AR-bai-ten',
+          meaning: 'Eu posso trabalhar aqui.',
+          parts: [
+            { chunk: 'Ich', label: 'QUEM' },
+            { chunk: 'kann', label: 'MODAL' },
+            { chunk: 'hier', label: 'ONDE' },
+            { chunk: 'arbeiten', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Kannst du hier wohnen?',
+          reading: 'kanst du rír VÔ-nen',
+          meaning: 'Você pode morar aqui?',
+          parts: [
+            { chunk: 'Kannst', label: 'MODAL' },
+            { chunk: 'du', label: 'QUEM' },
+            { chunk: 'hier', label: 'ONDE' },
+            { chunk: 'wohnen', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Heute muss ich arbeiten.',
+          reading: 'HÓI-te mus ish AR-bai-ten',
+          meaning: 'Hoje eu preciso trabalhar.',
+          parts: [
+            { chunk: 'Heute', label: 'QUANDO' },
+            { chunk: 'muss', label: 'MODAL' },
+            { chunk: 'ich', label: 'QUEM' },
+            { chunk: 'arbeiten', label: 'AÇÃO' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'de-fund-10',
+      title: 'O passado que se usa para falar',
+      goal: 'Contar o que você fez ontem.',
+      rule: 'No dia a dia o alemão faz passado com DOIS pedaços: "haben" conjugado na segunda posição, e o particípio jogado no fim — o mesmo abraço do modal. O particípio quase sempre ganha "ge-" na frente.',
+      pieces: [
+        { term: 'gestern', meaning: 'ontem', reading: 'GUES-tern' },
+        { term: 'gearbeitet', meaning: 'trabalhado', reading: 'gue-AR-bai-tet', note: 'De "arbeiten". O "ge-" na frente é a marca do particípio.' },
+        { term: 'gewohnt', meaning: 'morado', reading: 'gue-VÔNT' },
+        { term: 'machen', meaning: 'fazer', reading: 'MA-rren' },
+        { term: 'gemacht', meaning: 'feito', reading: 'gue-MARRT', trap: 'O verbo encolhe: "machen" vira "gemacht", nunca "gemachen".' },
+      ],
+      sentences: [
+        {
+          text: 'Ich habe gearbeitet.',
+          reading: 'ish HÁ-be gue-AR-bai-tet',
+          meaning: 'Eu trabalhei.',
+          parts: [
+            { chunk: 'Ich', label: 'QUEM' },
+            { chunk: 'habe', label: 'TER' },
+            { chunk: 'gearbeitet', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Gestern habe ich gearbeitet.',
+          reading: 'GUES-tern HÁ-be ish gue-AR-bai-tet',
+          meaning: 'Ontem eu trabalhei.',
+          parts: [
+            { chunk: 'Gestern', label: 'QUANDO' },
+            { chunk: 'habe', label: 'TER' },
+            { chunk: 'ich', label: 'QUEM' },
+            { chunk: 'gearbeitet', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Du hast hier gewohnt.',
+          reading: 'du hast rír gue-VÔNT',
+          meaning: 'Você morou aqui.',
+          parts: [
+            { chunk: 'Du', label: 'QUEM' },
+            { chunk: 'hast', label: 'TER' },
+            { chunk: 'hier', label: 'ONDE' },
+            { chunk: 'gewohnt', label: 'AÇÃO' },
+          ],
+        },
+        {
+          text: 'Was hast du gemacht?',
+          reading: 'vas hast du gue-MARRT',
+          meaning: 'O que você fez?',
+          parts: [
+            { chunk: 'Was', label: 'PERGUNTA' },
+            { chunk: 'hast', label: 'TER' },
+            { chunk: 'du', label: 'QUEM' },
+            { chunk: 'gemacht', label: 'AÇÃO' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'de-fund-11',
+      title: 'Você formal, e mais de um',
+      goal: 'Falar com quem você não conhece, e falar de um grupo.',
+      rule: 'O "você" formal é "Sie", com maiúscula, e ele usa a MESMA forma do plural: sind. Com estranho, com atendente, com chefe, é sempre Sie — usar "du" ali soa íntimo demais.',
+      pieces: [
+        { term: 'Sie sind', meaning: 'o senhor é, a senhora é', reading: 'zi zint', trap: 'Escrito igual a "sie sind" (eles são). A maiúscula no meio da frase é a única diferença.' },
+        { term: 'wir sind', meaning: 'nós somos', reading: 'vir zint' },
+        { term: 'ihr seid', meaning: 'vocês são', reading: 'ir zait' },
+        { term: 'Leute', meaning: 'pessoas', reading: 'LÓI-te', note: 'Só existe no plural — não há "uma Leute".' },
+        { term: 'viele', meaning: 'muitos, muitas', reading: 'FÍ-le' },
+      ],
+      sentences: [
+        {
+          text: 'Sie sind Brasilianer.',
+          reading: 'zi zint bra-zi-LI-a-ner',
+          meaning: 'O senhor é brasileiro.',
+          parts: [
+            { chunk: 'Sie', label: 'QUEM' },
+            { chunk: 'sind', label: 'SER' },
+            { chunk: 'Brasilianer', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'Wir sind hier.',
+          reading: 'vir zint rír',
+          meaning: 'Nós estamos aqui.',
+          parts: [
+            { chunk: 'Wir', label: 'QUEM' },
+            { chunk: 'sind', label: 'SER' },
+            { chunk: 'hier', label: 'ONDE' },
+          ],
+        },
+        {
+          text: 'Wo wohnen Sie?',
+          reading: 'vô VÔ-nen zi',
+          meaning: 'Onde o senhor mora?',
+          parts: [
+            { chunk: 'Wo', label: 'PERGUNTA' },
+            { chunk: 'wohnen', label: 'AÇÃO' },
+            { chunk: 'Sie', label: 'QUEM' },
+          ],
+        },
+        {
+          text: 'Hier sind viele Leute.',
+          reading: 'rír zint FÍ-le LÓI-te',
+          meaning: 'Aqui tem muita gente.',
+          parts: [
+            { chunk: 'Hier', label: 'ONDE' },
+            { chunk: 'sind', label: 'SER' },
+            { chunk: 'viele Leute', label: 'O QUÊ' },
+          ],
+        },
+      ],
+    },
   ],
 
   ru: [
@@ -971,6 +1144,167 @@ export const FOUNDATION_TRACKS: Record<string, FoundationLesson[]> = {
             { chunk: 'Моя книга', label: 'O QUÊ' },
             { chunk: 'не', label: 'NÃO' },
             { chunk: 'в доме', label: 'ONDE' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'ru-fund-9',
+      title: 'O objeto: quando a palavra muda de fim',
+      goal: 'Dizer o que você faz com alguma coisa — e ver o acusativo aparecer.',
+      rule: 'Quando a coisa DEIXA de ser quem faz e passa a ser o que sofre a ação, o fim dela muda: книга vira книгу, вода vira воду. O feminino em -а é onde isso salta aos olhos; coisa masculina fica igual, e por isso passa despercebida.',
+      pieces: [
+        { term: 'читать', meaning: 'ler', reading: 'tchi-TAT' },
+        { term: 'я читаю', meaning: 'eu leio', reading: 'iá tchi-TÁ-iu' },
+        { term: 'ты читаешь', meaning: 'você lê', reading: 'ty tchi-TÁ-iech' },
+        { term: 'книгу', meaning: 'livro (como objeto)', reading: 'KNÍ-gu', trap: 'É книга com o fim trocado. Dizer "я читаю книга" é o erro clássico.' },
+        { term: 'пить', meaning: 'beber', reading: 'pit' },
+        { term: 'я пью', meaning: 'eu bebo', reading: 'iá piu' },
+        { term: 'воду', meaning: 'água (como objeto)', reading: 'VÓ-du', note: 'вода vira воду — e repare que a tônica muda de lugar junto.' },
+      ],
+      sentences: [
+        {
+          text: 'Я читаю книгу.',
+          reading: 'iá tchi-TÁ-iu KNÍ-gu',
+          meaning: 'Eu leio um livro.',
+          parts: [
+            { chunk: 'Я', label: 'QUEM' },
+            { chunk: 'читаю', label: 'AÇÃO' },
+            { chunk: 'книгу', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'Я пью воду.',
+          reading: 'iá piu VÓ-du',
+          meaning: 'Eu bebo água.',
+          parts: [
+            { chunk: 'Я', label: 'QUEM' },
+            { chunk: 'пью', label: 'AÇÃO' },
+            { chunk: 'воду', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'Ты читаешь книгу?',
+          reading: 'ty tchi-TÁ-iech KNÍ-gu',
+          meaning: 'Você está lendo um livro?',
+          parts: [
+            { chunk: 'Ты', label: 'QUEM' },
+            { chunk: 'читаешь', label: 'AÇÃO' },
+            { chunk: 'книгу', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'Я не читаю дома.',
+          reading: 'iá nie tchi-TÁ-iu DÓ-ma',
+          meaning: 'Eu não leio em casa.',
+          parts: [
+            { chunk: 'Я', label: 'QUEM' },
+            { chunk: 'не', label: 'NÃO' },
+            { chunk: 'читаю', label: 'AÇÃO' },
+            { chunk: 'дома', label: 'ONDE' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'ru-fund-10',
+      title: 'Ter, que em russo é "junto de mim há"',
+      goal: 'Dizer que você tem alguma coisa.',
+      rule: 'Não existe o verbo "ter". Diz-se "у меня есть книга" — ao pé da letra, "junto de mim há livro". E repare no que isso faz: a coisa NÃO muda de fim, porque ela é quem existe, não o objeto de ninguém.',
+      pieces: [
+        { term: 'у меня есть', meaning: 'eu tenho', reading: 'u mie-NIÁ iest', note: 'Três palavras para o nosso "tenho". Vale decorar o bloco inteiro de uma vez.' },
+        { term: 'у тебя есть', meaning: 'você tem', reading: 'u tie-BIÁ iest' },
+        { term: 'у него есть', meaning: 'ele tem', reading: 'u nie-VÔ iest', trap: 'O "г" de него se lê "v". É a exceção mais comum do russo.' },
+        { term: 'время', meaning: 'tempo', reading: 'VRIÉ-mia' },
+        { term: 'собака', meaning: 'cachorro', reading: 'sa-BÁ-ka' },
+      ],
+      sentences: [
+        {
+          text: 'У меня есть книга.',
+          reading: 'u mie-NIÁ iest KNÍ-ga',
+          meaning: 'Eu tenho um livro.',
+          parts: [
+            { chunk: 'У меня есть', label: 'TER' },
+            { chunk: 'книга', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'У тебя есть время?',
+          reading: 'u tie-BIÁ iest VRIÉ-mia',
+          meaning: 'Você tem tempo?',
+          parts: [
+            { chunk: 'У тебя есть', label: 'TER' },
+            { chunk: 'время', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'У него есть собака.',
+          reading: 'u nie-VÔ iest sa-BÁ-ka',
+          meaning: 'Ele tem um cachorro.',
+          parts: [
+            { chunk: 'У него есть', label: 'TER' },
+            { chunk: 'собака', label: 'O QUÊ' },
+          ],
+        },
+        {
+          text: 'У меня есть вода.',
+          reading: 'u mie-NIÁ iest va-DÁ',
+          meaning: 'Eu tenho água.',
+          parts: [
+            { chunk: 'У меня есть', label: 'TER' },
+            { chunk: 'вода', label: 'O QUÊ' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'ru-fund-11',
+      title: 'Mais de um',
+      goal: 'Falar de várias coisas ao mesmo tempo.',
+      rule: 'O plural quase sempre troca o fim por -ы ou -и: стол vira столы, книга vira книги. Não há artigo para avisar — a única pista de que são vários está na última letra.',
+      pieces: [
+        { term: 'книги', meaning: 'livros', reading: 'KNÍ-gui' },
+        { term: 'столы', meaning: 'mesas', reading: 'sta-LY', note: 'A tônica pula para o fim no plural: STOL vira staLY.' },
+        { term: 'окна', meaning: 'janelas', reading: 'ÓK-na', note: 'Neutro em -о faz plural em -а, ao contrário dos outros.' },
+        { term: 'друзья', meaning: 'amigos', reading: 'dru-ZIÁ', trap: 'друг não vira "други". Este é irregular e é dos mais usados — vale decorar.' },
+        { term: 'студенты', meaning: 'estudantes', reading: 'stu-DIÉN-ty' },
+        { term: 'мои', meaning: 'meus, minhas', reading: 'ma-Í', note: 'No plural o possessivo é um só para os três gêneros — мой, моя e моё viram todos мои.' },
+      ],
+      sentences: [
+        {
+          text: 'Это книги.',
+          reading: 'É-ta KNÍ-gui',
+          meaning: 'Estes são livros.',
+          parts: [
+            { chunk: 'Это', label: 'O QUÊ' },
+            { chunk: 'книги', label: 'O QUE É' },
+          ],
+        },
+        {
+          text: 'Столы здесь.',
+          reading: 'sta-LY zdiés',
+          meaning: 'As mesas estão aqui.',
+          parts: [
+            { chunk: 'Столы', label: 'O QUÊ' },
+            { chunk: 'здесь', label: 'ONDE' },
+          ],
+        },
+        {
+          text: 'Это мои друзья.',
+          reading: 'É-ta ma-Í dru-ZIÁ',
+          meaning: 'Estes são meus amigos.',
+          parts: [
+            { chunk: 'Это', label: 'O QUÊ' },
+            { chunk: 'мои друзья', label: 'O QUE É' },
+          ],
+        },
+        {
+          text: 'Студенты дома.',
+          reading: 'stu-DIÉN-ty DÓ-ma',
+          meaning: 'Os estudantes estão em casa.',
+          parts: [
+            { chunk: 'Студенты', label: 'QUEM' },
+            { chunk: 'дома', label: 'ONDE' },
           ],
         },
       ],

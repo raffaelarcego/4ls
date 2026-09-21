@@ -1,0 +1,42 @@
+# Portao unico do projeto.
+#
+# Existe porque num unico dia de trabalho apareceram cinco regressoes pequenas
+# que ninguem pegou -- XP rotulado como "minutos", verde do Duolingo sobrando no
+# manifest, barra de nivel chegando a 100% sem subir de nivel, card de idioma
+# estourando a largura da tela. Todas foram encontradas por acaso, porque nada
+# olhava.
+#
+# Roda o mesmo `npm run check` que roda na maquina: testes de logica da API,
+# typecheck do front e a medicao de vazamento horizontal em tres larguras de
+# celular. Se passar aqui, passa la.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A medicao de layout abre um navegador de verdade. So o Chromium, e sem
+      # as dependencias de sistema dos outros: baixar Firefox e WebKit aqui
+      # dobraria o tempo do job sem medir nada a mais.
+      - run: npx playwright install --with-deps chromium
+
+      # O client do Prisma e gerado, nao versionado -- sem isto o typecheck da
+      # API nao encontra os tipos das tabelas.
+      - run: npx prisma generate
+        working-directory: apps/api
+
+      - run: npm run check

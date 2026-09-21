@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AlphabetModule } from '../alphabet/alphabet.module';
+import { AssessmentModule } from '../assessment/assessment.module';
 import { ErrorsModule } from '../errors/errors.module';
 import { FoundationModule } from '../foundation/foundation.module';
 import { GamificationModule } from '../gamification/gamification.module';
@@ -8,7 +9,7 @@ import { StudyController } from './study.controller';
 import { StudyService } from './study.service';
 
 @Module({
-  imports: [ReviewModule, ErrorsModule, GamificationModule, AlphabetModule, FoundationModule],
+  imports: [ReviewModule, ErrorsModule, GamificationModule, AlphabetModule, FoundationModule, AssessmentModule],
   controllers: [StudyController],
   providers: [StudyService],
   exports: [StudyService],

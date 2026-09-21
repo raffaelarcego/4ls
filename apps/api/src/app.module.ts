@@ -5,6 +5,7 @@ import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SpeechModule } from './infrastructure/speech/speech.module';
 import { AlphabetModule } from './modules/alphabet/alphabet.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AssessmentModule } from './modules/assessment/assessment.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CanDoModule } from './modules/cando/can-do.module';
 import { ConceptsModule } from './modules/concepts/concepts.module';
@@ -15,6 +16,7 @@ import { GamificationModule } from './modules/gamification/gamification.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { HealthModule } from './modules/health/health.module';
 import { LanguagesModule } from './modules/languages/languages.module';
+import { ReferenceModule } from './modules/reference/reference.module';
 import { ReviewModule } from './modules/review/review.module';
 import { SpeechFeatureModule } from './modules/speech/speech.module';
 import { StructureModule } from './modules/structure/structure.module';
@@ -35,8 +37,10 @@ import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
     ConceptsModule,
     AlphabetModule,
     FoundationModule,
+    AssessmentModule,
     StructureModule,
     CanDoModule,
+    ReferenceModule,
     ReviewModule,
     ErrorsModule,
     GamificationModule,

@@ -6,7 +6,9 @@ import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { BasePage } from './features/base/BasePage';
 import { GrammarPage } from './features/grammar/GrammarPage';
+import { ReferencePage } from './features/reference/ReferencePage';
 import { SessionPage } from './features/study/SessionPage';
 import { TutorPage } from './features/tutor/TutorPage';
 import { VocabularyPage } from './features/vocabulary/VocabularyPage';
@@ -67,8 +69,21 @@ export function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/vocabulario" element={<VocabularyPage />} />
               <Route path="/estruturas" element={<GrammarPage />} />
-              <Route path="/tutor" element={<TutorPage />} />
-              <Route path="/progresso" element={<AnalyticsPage />} />
+              {/*
+                Consulta, tutor e progresso vivem sob a Base: sao o que se faz
+                ENTRE as missoes, e juntas liberam tres vagas no rodape.
+              */}
+              <Route path="/base" element={<BasePage />}>
+                <Route index element={<Navigate to="consulta" replace />} />
+                <Route path="consulta" element={<ReferencePage />} />
+                <Route path="tutor" element={<TutorPage />} />
+                <Route path="progresso" element={<AnalyticsPage />} />
+              </Route>
+              {/* Os enderecos antigos continuam valendo: um atalho ja salvo na
+                  tela inicial do celular nao pode parar de funcionar. */}
+              <Route path="/consulta" element={<Navigate to="/base/consulta" replace />} />
+              <Route path="/tutor" element={<Navigate to="/base/tutor" replace />} />
+              <Route path="/progresso" element={<Navigate to="/base/progresso" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Layout>

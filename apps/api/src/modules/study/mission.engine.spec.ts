@@ -656,3 +656,87 @@ describe('pillarForType', () => {
     expect(pillarForType('nao-existe')).toBe(Pillar.LEARN);
   });
 });
+
+/**
+ * A prova mensal.
+ *
+ * Ela e o contrapeso da autoavaliacao: todo o resto do app mede por opiniao do
+ * aluno ou cobra na mesma sessao que ensinou, e as notas disso sao exatamente
+ * o que o ranqueamento usa para decidir o dia seguinte.
+ */
+describe('avaliacao periodica', () => {
+  const quatro = () => [
+    language({ code: 'en', minutesPerDay: 15 }),
+    language({ code: 'es', minutesPerDay: 15 }),
+    language({ code: 'de', minutesPerDay: 15 }),
+    language({ code: 'ru', minutesPerDay: 15 }),
+  ];
+
+  it('nao entra sem ser pedida -- ela e mensal, nao diaria', () => {
+    const plan = planSession(quatro(), 60);
+
+    expect(plan.activities.some((a) => a.type === 'assessment')).toBe(false);
+  });
+
+  /**
+   * ABRE o dia, antes ate do contraste. Servi-la depois da aula de hoje
+   * deixaria o conteudo recem-visto vazar para a medida.
+   */
+  it('vem primeiro, antes de qualquer bloco que ensina', () => {
+    const plan = planSession(quatro(), 60, { includeAssessment: true });
+
+    expect(plan.activities[0].type).toBe('assessment');
+  });
+
+  it('entra uma vez so e nao estoura o tempo do dia', () => {
+    const plan = planSession(quatro(), 60, { includeAssessment: true });
+
+    expect(plan.activities.filter((a) => a.type === 'assessment')).toHaveLength(1);
+    expect(plan.totalMinutes).toBe(60);
+  });
+
+  it('sai do total, sem roubar os blocos obrigatorios de nenhum idioma', () => {
+    const plan = planSession(quatro(), 60, { includeAssessment: true });
+
+    for (const code of ['en', 'es', 'de', 'ru']) {
+      const tipos = plan.activities.filter((a) => a.languageCode === code).map((a) => a.type);
+      expect(tipos).toContain('structure');
+      expect(tipos).toContain('vocabulary');
+    }
+  });
+
+  it('cabe junto com a producao quadrupla sem estourar', () => {
+    const plan = planSession(quatro(), 60, {
+      includeAssessment: true,
+      includeProduction: true,
+    });
+
+    expect(plan.totalMinutes).toBe(60);
+    expect(plan.activities.filter((a) => a.type === 'assessment')).toHaveLength(1);
+    expect(plan.activities.filter((a) => a.type === 'production')).toHaveLength(1);
+  });
+
+  it('nao aparece num dia curto demais para comporta-la', () => {
+    const plan = planSession(quatro(), 12, { includeAssessment: true });
+
+    expect(plan.activities.some((a) => a.type === 'assessment')).toBe(false);
+  });
+
+  it('esta sob LEVEL_UP e diz que nao depende de opiniao', () => {
+    const plan = planSession(quatro(), 60, { includeAssessment: true });
+    const bloco = plan.activities.find((a) => a.type === 'assessment');
+
+    expect(pillarForType('assessment')).toBe(Pillar.LEVEL_UP);
+    expect(bloco?.reason).toContain('autoavaliação');
+  });
+
+  it('nunca entra no ranqueamento de um idioma', () => {
+    // Ela atravessa os quatro. Deixa-la concorrer por vaga daria uma prova por
+    // idioma, cada uma dizendo pertencer a uma lingua so.
+    const state = language({ minutesPerDay: 40 });
+    state.skills.grammar = 1;
+    const plan = planSession([state], 40);
+
+    expect(plan.activities.some((a) => a.type === 'assessment')).toBe(false);
+  });
+});

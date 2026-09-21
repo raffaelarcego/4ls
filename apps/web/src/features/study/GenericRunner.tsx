@@ -9,6 +9,7 @@ import { ProgressBar } from '../../components/ProgressBar';
 import { api, errorMessage } from '../../services/api';
 import { SessionActivity } from '../../types';
 import { AlphabetRunner } from './AlphabetRunner';
+import { AssessmentRunner } from './AssessmentRunner';
 import { CanDoCompareRunner } from './CanDoCompareRunner';
 import { CanDoContrastRunner } from './CanDoContrastRunner';
 import { DictationRunner } from './DictationRunner';
@@ -76,6 +77,10 @@ export function GenericRunner({
   // pronome nem verbo -- que era o caso em alemao e em russo.
   if (activity.type === 'foundation') {
     return <FoundationRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
+  }
+  // A prova do mes: o unico bloco que mede em vez de ensinar.
+  if (activity.type === 'assessment') {
+    return <AssessmentRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
   }
   if (activity.type === 'structure') {
     return <StructureRunner activity={activity} onFinish={onFinish} onSkip={onSkip} />;
