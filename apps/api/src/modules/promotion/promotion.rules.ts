@@ -104,22 +104,6 @@ export const ROUNDS = ['sentences', 'reading', 'vocabulary'] as const;
 
 export type Round = (typeof ROUNDS)[number];
 
-/** O nome de cada rodada na tela, e o que ela cobra. */
-export const ROUND_LABEL: Record<Round, { title: string; blurb: string }> = {
-  sentences: {
-    title: 'Montar a frase',
-    blurb: 'A ordem das peças, sem rótulo e sem dica.',
-  },
-  reading: {
-    title: 'Entender o texto',
-    blurb: 'Detalhes das histórias que você leu neste idioma.',
-  },
-  vocabulary: {
-    title: 'Saber a palavra',
-    blurb: 'Termos que você deu por aprendidos.',
-  },
-};
-
 export interface RoundTally {
   round: Round;
   correct: number;

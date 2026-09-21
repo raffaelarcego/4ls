@@ -5,6 +5,7 @@ import { SendIcon } from '../../components/Icons';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
 import { DashboardLanguage } from '../../types';
+import { HandsFree, HandsFreeReply } from './HandsFree';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,6 +24,7 @@ export function TutorPage() {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [handsFree, setHandsFree] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: languages } = useQuery<DashboardLanguage[]>({
@@ -67,6 +69,28 @@ export function TutorPage() {
     },
   });
 
+  /**
+   * O turno do modo maos livres.
+   *
+   * Passa pelo MESMO endpoint e pela mesma conversa do chat escrito -- e isso
+   * importa mais do que parece: o historico continua um so, os erros continuam
+   * indo para o Error Intelligence, e o que foi falado fica legivel na tela
+   * depois. Um modo de voz com conversa separada seria um segundo tutor que nao
+   * aprende com o primeiro.
+   *
+   * Devolve so a frase corrigida, e nao a explicacao: quem esta caminhando
+   * consegue absorver "o certo seria X", nao uma aula sobre o dativo. A
+   * explicacao fica no historico.
+   */
+  async function speakTurn(transcript: string): Promise<HandsFreeReply> {
+    setMessages((prev) => [...prev, { role: 'user', content: transcript }]);
+    const data = await send.mutateAsync(transcript);
+    return {
+      reply: data.reply,
+      corrected: data.correction?.hasErrors ? data.correction.corrected : null,
+    };
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const content = draft.trim();
@@ -77,6 +101,9 @@ export function TutorPage() {
   }
 
   function switchLanguage(code: string) {
+    // Trocar de idioma no meio de uma conversa por voz deixaria o laco falando
+    // e ouvindo no idioma antigo, porque ele ja capturou o codigo.
+    setHandsFree(false);
     setLanguageCode(code);
     setConversationId(undefined);
     setMessages([]);
@@ -113,6 +140,26 @@ export function TutorPage() {
           );
         })}
       </div>
+
+      {/*
+        O modo maos livres fica ACIMA do historico, e nao escondido num menu:
+        ele existe para o tempo em que o aluno NAO esta sentado -- caminhada,
+        transito, cozinha --, e um atalho que precisa ser procurado nunca e
+        usado com o telefone no bolso.
+      */}
+      {handsFree ? (
+        <HandsFree
+          languageCode={languageCode}
+          languageName={languages?.find((l) => l.code === languageCode)?.name ?? languageCode}
+          busy={send.isPending}
+          onSpeak={speakTurn}
+          onStop={() => setHandsFree(false)}
+        />
+      ) : (
+        <button className="btn-blue w-full" onClick={() => setHandsFree(true)}>
+          Conversar de mãos livres
+        </button>
+      )}
 
       <div className="min-h-[26rem] space-y-3 rounded-lg border border-swan bg-snow p-4">
         {messages.length === 0 && (

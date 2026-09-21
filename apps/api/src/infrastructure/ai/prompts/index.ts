@@ -1135,6 +1135,48 @@ Cada versao precisa das ${sentences} frases, e todas as ${ctx.targets.length} ve
 }
 
 // ---------------------------------------------------------------------------
+// Captura por foto
+// ---------------------------------------------------------------------------
+
+/**
+ * Le o texto que aparece numa foto.
+ *
+ * O bloco de captura ja transforma um texto colado em conceitos nos quatro
+ * idiomas. Isto e so a porta que faltava no celular: a lingua acontece em
+ * cardapio, placa, bula e embalagem, e nenhum deles da para colar.
+ *
+ * O pedido e deliberadamente burro: TRANSCREVER, nao interpretar. A tentacao do
+ * modelo aqui e ser util -- corrigir a grafia da placa, traduzir o cardapio,
+ * resumir o que viu. Qualquer uma dessas estraga a captura, porque o que entra
+ * no vocabulario tem de ser a palavra que estava LA. E se a foto nao tiver
+ * texto, dizer isso e melhor que inventar: o aluno fotografa de novo em dois
+ * segundos, e um texto inventado viraria card para sempre.
+ */
+export function photoTextPrompt(languageName: string): string {
+  return `Transcreva o texto que aparece nesta imagem.
+
+O texto esta, ou deveria estar, em ${languageName}.
+
+Regras:
+- TRANSCREVA, nao traduza, nao corrija e nao explique. A palavra que vai para o
+  estudo do aluno tem de ser a que esta na imagem.
+- Mantenha a grafia, os acentos e a caixa como estao escritos.
+- Ignore o que nao e texto: logotipo sem palavra, numero de preco solto, codigo
+  de barras, marca d'agua.
+- Se o texto estiver em varias colunas ou blocos, transcreva na ordem em que uma
+  pessoa leria.
+- Se a imagem nao tiver texto legivel, devolva "text" vazio e explique em "note".
+- Se o texto estiver em outro idioma que nao ${languageName}, transcreva mesmo
+  assim e avise em "note".
+
+Responda APENAS com JSON valido:
+{
+  "text": "o texto transcrito, com quebras de linha onde elas existem",
+  "note": "uma linha em portugues sobre o que atrapalhou a leitura, ou null"
+}`;
+}
+
+// ---------------------------------------------------------------------------
 // Captura de texto
 // ---------------------------------------------------------------------------
 

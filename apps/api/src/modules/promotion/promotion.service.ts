@@ -212,11 +212,6 @@ export class PromotionService {
     };
   }
 
-  /** Quantos chefes ele ja venceu. Alimenta a conquista. */
-  async victories(userId: string): Promise<number> {
-    return this.prisma.assessment.count({ where: { userId, skill: PROMOTION_WON } });
-  }
-
   private async requireOpenGate(userId: string, languageCode: string) {
     const userLanguage = await this.prisma.userLanguage.findFirst({
       where: { userId, language: { code: languageCode } },

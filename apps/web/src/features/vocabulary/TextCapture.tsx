@@ -1,5 +1,6 @@
 ﻿import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { preparePhoto } from '../../lib/photo';
 import { languageTheme } from '../../lib/ui';
 import { api, errorMessage } from '../../services/api';
 import { CaptureResult } from '../../types';
@@ -29,6 +30,8 @@ export function TextCapture() {
   const [languageCode, setLanguageCode] = useState('en');
   const [text, setText] = useState('');
   const [result, setResult] = useState<CaptureResult | null>(null);
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   const capture = useMutation({
     mutationFn: async () => {
@@ -40,6 +43,33 @@ export function TextCapture() {
       setText('');
       queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  /**
+   * A foto vira texto -- e para ai.
+   *
+   * O texto lido cai no mesmo campo em que ele colaria um artigo, e a captura de
+   * verdade continua sendo o botao de sempre. Ingerir direto pareceria mais
+   * magico e seria pior: OCR de foto erra, e um erro vira card nos quatro
+   * idiomas de uma vez. Conferir antes custa um toque.
+   */
+  const readPhoto = useMutation({
+    mutationFn: async (file: File) => {
+      const photo = await preparePhoto(file);
+      const { data } = await api.post('/concepts/capture/photo', {
+        languageCode,
+        image: photo.data,
+        mimeType: photo.mimeType,
+      });
+      return data as { text: string; note: string | null };
+    },
+    onSuccess: (data) => {
+      setPhotoNote(data.note);
+      // Acrescenta em vez de substituir: duas fotos de paginas seguidas do
+      // mesmo cardapio sao um texto so, e sobrescrever perderia a primeira.
+      setText((current) => (current.trim() ? `${current.trim()}
+${data.text}` : data.text));
     },
   });
 
@@ -96,8 +126,48 @@ export function TextCapture() {
         className="input min-h-[9rem] resize-y text-sm"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Cole aqui o texto no idioma escolhido..."
+        placeholder="Cole aqui o texto no idioma escolhido — ou fotografe."
       />
+
+      {/*
+        `capture="environment"` abre a camera traseira direto no celular, sem
+        passar pela galeria. No desktop o mesmo campo vira "escolher arquivo",
+        que e o comportamento certo la.
+      */}
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Limpa o valor para a MESMA foto poder ser escolhida de novo depois
+          // de um erro -- sem isso o `change` nao dispara na segunda vez.
+          event.target.value = '';
+          if (file) readPhoto.mutate(file);
+        }}
+      />
+
+      <button
+        className="btn-ghost w-full"
+        onClick={() => photoInput.current?.click()}
+        disabled={readPhoto.isPending}
+      >
+        {readPhoto.isPending ? 'Lendo a foto...' : 'Fotografar um texto'}
+      </button>
+
+      {photoNote && (
+        <p className="rounded-md border border-bee bg-bee-soft px-3 py-2 text-xs leading-snug text-bee-dark">
+          {photoNote}
+        </p>
+      )}
+
+      {readPhoto.isError && (
+        <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">
+          {errorMessage(readPhoto.error)}
+        </p>
+      )}
 
       {capture.isError && (
         <p className="rounded-md bg-cardinal-soft px-3 py-2 text-sm text-cardinal-dark">

@@ -16,7 +16,12 @@ import {
   SessionActivity,
 } from '../../types';
 
-/** O nome de cada rodada e o que ela cobra — o mesmo texto do backend. */
+/**
+ * O nome de cada rodada e o que ela cobra.
+ *
+ * Vive aqui e só aqui: é texto de tela, e o backend não tem tela. Ter uma cópia
+ * lá "por simetria" seria uma constante que ninguém lê e que envelhece sozinha.
+ */
 const ROUND: Record<PromotionRound, { title: string; blurb: string }> = {
   sentences: { title: 'Montar a frase', blurb: 'A ordem das peças, sem rótulo e sem dica.' },
   reading: { title: 'Entender o texto', blurb: 'Detalhes das histórias que você leu.' },

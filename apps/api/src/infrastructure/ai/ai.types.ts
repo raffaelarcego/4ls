@@ -10,6 +10,7 @@ export type AiTask =
   | 'grammar.drill'
   | 'concept.translate'
   | 'concept.extract'
+  | 'capture.ocr'
   | 'production.evaluate'
   | 'structure.generate'
   | 'cando.generate'
@@ -62,6 +63,10 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   // da tabela -- o modelo rapido erra esse casamento com frequencia, e o
   // exercicio sai sem resposta certa.
   'morphology.generate',
+  // Ler o texto de uma foto exige modelo que enxergue, e os que enxergam sao os
+  // fortes. Nao e escolha de qualidade -- o modelo rapido simplesmente nao tem
+  // a capacidade.
+  'capture.ocr',
   // Traduzir um conceito e curto, mas erra de um jeito que estraga: uma palavra
   // pouco natural em russo vira card e o aluno decora o que ninguem diz.
   'concept.translate',
@@ -71,9 +76,30 @@ export const COMPLEX_TASKS: ReadonlySet<AiTask> = new Set<AiTask>([
   'production.evaluate',
 ]);
 
+/** Uma imagem anexada a uma mensagem, em base64. */
+export interface AiImage {
+  /** Base64 puro, sem o prefixo `data:`. */
+  data: string;
+  mimeType: string;
+}
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /**
+   * Imagens que acompanham esta mensagem.
+   *
+   * O gateway existe justamente para o resto do sistema nao saber como cada
+   * provider formata as coisas, e imagem e o caso mais gritante disso: o
+   * formato multimodal e um array de partes tipadas, nada parecido com o texto
+   * puro. Quem chama continua mandando `content` como sempre e junta as imagens
+   * aqui; a traducao para o formato do provider e problema do provider.
+   *
+   * So funciona com modelo que enxerga. O `strongModel` padrao dos dois
+   * providers enxerga, mas um modelo configurado a mao pode nao enxergar -- e
+   * ai o erro vem do provider, com a mensagem dele.
+   */
+  images?: AiImage[];
 }
 
 export interface AiChatInput {

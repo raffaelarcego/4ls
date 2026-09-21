@@ -241,6 +241,31 @@ Por isso a validação mais severa do módulo é o alinhamento (`alignedPassage`
 
 A escolha do texto do dia inverte a regra dos outros blocos: em vez do assunto menos dominado, vem a história que ele **já leu em outro idioma e ainda não leu neste** — é a segunda leitura que dá o andaime. As perguntas de compreensão são por idioma e de **detalhe**, nunca de ideia geral: na terceira leitura ele já sabe a história e acertaria de memória, sem ler uma linha.
 
+**Captura por foto** (`apps/api/src/modules/concepts/` + `apps/web/src/lib/photo.ts`)
+A captura de texto já transformava um artigo colado em conceitos nos quatro idiomas. Faltava a porta do celular: a língua acontece em cardápio, placa, bula e embalagem, e nenhum deles dá para colar.
+
+Duas decisões carregam o resto:
+
+- **A foto vira texto, e para aí.** O texto lido cai no mesmo campo em que você colaria um artigo, e a captura de verdade continua sendo o botão de sempre. Ingerir direto pareceria mais mágico e seria pior: OCR de foto erra, e um erro vira card nos quatro idiomas de uma vez. Conferir custa um toque.
+- **O pedido ao modelo é deliberadamente burro: transcrever, não interpretar.** A tentação dele aqui é ser útil — corrigir a grafia da placa, traduzir o cardápio, resumir o que viu. Qualquer uma dessas estraga a captura, porque a palavra que entra no estudo tem de ser a que estava lá. Foto sem texto legível devolve vazio e diz por quê, em vez de inventar.
+
+O **AI Gateway ganhou imagens** para isso (`AiMessage.images`). Quem chama continua mandando `content` como sempre; traduzir para o array de partes tipadas do formato multimodal é problema do provider — que é exatamente o que o gateway existe para esconder. Mensagem sem imagem continua indo como string: mandar sempre o array pareceria mais uniforme e quebraria as chamadas de texto puro em troca de nada.
+
+A foto é reduzida no navegador antes de subir (`preparePhoto`), e não é só para caber nos 4 MB do corpo: um modelo que lê texto em imagem não enxerga melhor com 12 megapixels — ele redimensiona por dentro de qualquer jeito, e a foto grande só custa mais token e mais espera. A orientação EXIF é respeitada na hora de reduzir, senão foto tirada com o telefone deitado chega girada — e texto girado não é lido.
+
+**Tutor de mãos livres** (`apps/web/src/features/tutor/HandsFree.tsx`)
+O tutor por escrito exige as duas mãos e os olhos, então ele só acontece sentado — e o tempo em que dava para praticar falando (caminhada, trânsito, cozinha) simplesmente não existia no produto. Este modo é sobre esse tempo.
+
+O laço é ouvir → mandar → falar a resposta → ouvir de novo, e ele passa pelo **mesmo endpoint e pela mesma conversa** do chat escrito. Isso importa mais do que parece: o histórico continua um só, os erros continuam indo para o Error Intelligence, e o que foi falado fica legível na tela depois. Um modo de voz com conversa separada seria um segundo tutor que não aprende com o primeiro.
+
+Três decisões sustentam o laço:
+
+- **Nunca escuta enquanto fala.** O reconhecimento ouviria a própria voz do tutor e a mandaria de volta como se fosse do aluno — a conversa entraria em laço sozinha. Por isso os estados são exclusivos, não paralelos.
+- **A correção é falada, não explicada.** No texto o tutor mostra a categoria do erro e o porquê; falar isso tudo transformaria cada frase em aula e mataria a conversa. Aqui sai só a frase certa, no idioma, antes da resposta — que é como um nativo corrige numa conversa de verdade. A explicação fica no histórico.
+- **O silêncio encerra.** Dois silêncios seguidos e ele se desliga: o telefone foi guardado, e microfone aberto no bolso não serve a ninguém.
+
+O laço vive em `ref`, não em estado: ele é assíncrono e longo, e se a condição de parada fosse lida do estado, a volta em andamento seguiria conversando com o valor capturado no fechamento — depois de o aluno ter mandado parar.
+
 **Shadowing** (`apps/api/src/modules/shadowing/`)
 O Speaking Lab mede **produção**: dá uma missão, você fala o que quiser, a IA avalia. O que não havia era treino de **ritmo e encadeamento** — pegar uma frase pronta, dita por voz nativa, e devolvê-la inteira. É o exercício mais antigo que existe para soltar a língua, e o único que ataca a distância entre "eu sei a frase" e "eu consigo dizer a frase".
 
@@ -338,6 +363,8 @@ Nenhum módulo fala com MiMo ou OpenRouter diretamente. Tarefas complexas (avali
 - **Andaime na revisão** — quando o significado já firmou em outro idioma, o card fraco oferece a palavra que você domina como dica, em vez de reensinar o conceito do zero
 - **Produção quádrupla semanal** — escrever a mesma frase nos quatro idiomas, sem alternativas, com a correção olhando as quatro juntas
 - **Interferência com culpado nomeado** — o erro registra de qual idioma veio, e a tela de Estruturas mostra o contraste que resolve aquele par
+- **Captura por foto** — fotografe um cardápio, uma placa ou uma bula; o texto é lido, você confere, e o vocabulário entra como conceito nos quatro idiomas
+- **Tutor de mãos livres** — conversa por voz sem tocar na tela, na mesma conversa do tutor escrito: os erros continuam indo para o perfil e ficam legíveis depois
 - **Shadowing** — o app fala, você repete na hora, e a correção é palavra a palavra contra a frase original; sem IA, porque o gabarito é a própria frase
 - **Armadilhas cruzadas** — pares mínimos entre idiomas, em que a alternativa errada é a frase que sai quando outra língua vaza; a maior parte vem dos seus próprios erros, e acertar várias vezes **fecha** o erro
 - **Drill de casos** — em alemão e russo, a tabela viva de uma palavra que você já conhece, e a frase com a forma escondida; os distratores são as outras formas da mesma palavra
@@ -407,6 +434,7 @@ GET  /api/reading/lesson                 o texto de hoje num idioma + as outras 
 POST /api/reading/record                 resultado da compreensão, por texto e idioma
 GET  /api/concepts/production/mission    o conceito da vez para produção livre
 POST /api/concepts/production/evaluate   avalia as 4 frases juntas
+POST /api/concepts/capture/photo         le o texto de uma foto (nao aprende nada)
 POST /api/concepts/capture               extrai vocabulário de um texto colado
 GET  /api/errors/interference            quais idiomas estão contaminando quais
 POST /api/tutor/message                  conversa + correção estruturada

@@ -1,11 +1,38 @@
 import {
   AiChatInput,
+  AiMessage,
   AiChatResponse,
   AiProvider,
   AiProviderError,
   AiTask,
   COMPLEX_TASKS,
 } from './ai.types';
+
+/**
+ * Traduz uma mensagem do contrato interno para o formato do provider.
+ *
+ * Sem imagem, `content` vai como string -- que e o que todo provider aceita e o
+ * que este projeto manda em 99% das chamadas. Mandar SEMPRE o array de partes
+ * pareceria mais uniforme e seria pior: nem todo endpoint compativel aceita o
+ * formato multimodal, e o custo de uniformidade seria quebrar as chamadas de
+ * texto puro em troca de nada.
+ */
+function toWireMessage(message: AiMessage): Record<string, unknown> {
+  if (!message.images?.length) {
+    return { role: message.role, content: message.content };
+  }
+
+  return {
+    role: message.role,
+    content: [
+      { type: 'text', text: message.content },
+      ...message.images.map((image) => ({
+        type: 'image_url',
+        image_url: { url: `data:${image.mimeType};base64,${image.data}` },
+      })),
+    ],
+  };
+}
 
 /**
  * MiMo e OpenRouter expoem a mesma interface de chat completions do OpenAI,
@@ -40,7 +67,7 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
 
     const body: Record<string, unknown> = {
       model,
-      messages: input.messages,
+      messages: input.messages.map(toWireMessage),
       temperature: input.temperature ?? 0.6,
       max_tokens: input.maxTokens ?? 1200,
     };

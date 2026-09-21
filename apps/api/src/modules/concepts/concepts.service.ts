@@ -7,6 +7,7 @@ import {
   ConceptTarget,
   extractTermsPrompt,
   LearnerContext,
+  photoTextPrompt,
   ProductionAttempt,
   quadrupleProductionPrompt,
 } from '../../infrastructure/ai/prompts';
@@ -827,6 +828,46 @@ export class ConceptsService {
    * ao modelo para evitar repeticao funciona mal e custa tokens, enquanto o
    * banco responde isso com certeza.
    */
+  /**
+   * Le o texto de uma foto.
+   *
+   * Nao aprende nada: devolve o texto e para ai, de proposito. O aluno ve o que
+   * foi lido, apaga o que nao interessa e so entao manda capturar pela mesma
+   * porta de sempre. Ingerir direto pareceria mais magico e seria pior -- OCR de
+   * foto erra, e um erro que vira card nos quatro idiomas custa muito mais caro
+   * que um toque a mais.
+   */
+  async readPhoto(
+    userId: string,
+    input: { languageCode: string; image: string; mimeType: string },
+  ): Promise<{ text: string; note: string | null }> {
+    const profile = await this.profile(userId);
+    const language = profile.find((l) => l.code === input.languageCode);
+    if (!language) {
+      throw new NotFoundException(`Voce nao esta estudando o idioma "${input.languageCode}".`);
+    }
+
+    const result = await this.ai.chatJson<{ text?: string; note?: string | null }>({
+      task: 'capture.ocr',
+      json: true,
+      userId,
+      language: input.languageCode,
+      maxTokens: 2000,
+      messages: [
+        {
+          role: 'user',
+          content: photoTextPrompt(language.name),
+          images: [{ data: input.image, mimeType: input.mimeType }],
+        },
+      ],
+    });
+
+    return {
+      text: (result.text ?? '').trim().slice(0, MAX_CAPTURE_CHARS),
+      note: result.note?.trim() || null,
+    };
+  }
+
   async capture(
     userId: string,
     input: { languageCode: string; text: string; count?: number },

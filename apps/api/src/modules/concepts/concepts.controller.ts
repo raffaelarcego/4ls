@@ -5,6 +5,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -45,6 +46,20 @@ class CaptureDto {
   @IsString() languageCode!: string;
   @IsString() @MinLength(40) text!: string;
   @IsOptional() @IsInt() @Min(1) @Max(12) count?: number;
+}
+
+class PhotoDto {
+  @IsString() languageCode!: string;
+  /**
+   * A foto em base64, sem o prefixo `data:`.
+   *
+   * O limite de corpo da API e 4 MB e o da funcao na Vercel, 4.5 MB -- e uma
+   * foto de celular passa disso sozinha. Quem encolhe e o front, antes de
+   * mandar: imagem grande demais nao so estoura o limite como custa mais token
+   * sem melhorar a leitura.
+   */
+  @IsString() @MinLength(100) image!: string;
+  @IsIn(['image/jpeg', 'image/png', 'image/webp']) mimeType!: string;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -102,5 +117,17 @@ export class ConceptsController {
   @Post('capture')
   capture(@CurrentUser('id') userId: string, @Body() dto: CaptureDto) {
     return this.service.capture(userId, dto);
+  }
+
+  /**
+   * Le o texto de uma foto e devolve -- sem aprender nada.
+   *
+   * A captura de verdade continua sendo `POST /capture`, com o texto que o aluno
+   * conferiu. OCR de foto erra, e um erro que vira card nos quatro idiomas custa
+   * muito mais que um toque a mais.
+   */
+  @Post('capture/photo')
+  readPhoto(@CurrentUser('id') userId: string, @Body() dto: PhotoDto) {
+    return this.service.readPhoto(userId, dto);
   }
 }
