@@ -49,6 +49,18 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
     return {};
   }
 
+  /**
+   * Campos extras no corpo da requisicao, especificos de um provider.
+   *
+   * Existe por causa dos modelos de raciocinio: eles precisam de um parametro
+   * proprio para nao gastar o teto de tokens pensando, e esse parametro nao e
+   * padrao OpenAI -- mandar para quem nao entende e HTTP 400. Cada provider
+   * declara o seu aqui; a base nao manda nada.
+   */
+  protected extraBody(): Record<string, unknown> {
+    return {};
+  }
+
   isConfigured(): boolean {
     return Boolean(this.apiKey && this.baseUrl);
   }
@@ -70,6 +82,7 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
       messages: input.messages.map(toWireMessage),
       temperature: input.temperature ?? 0.6,
       max_tokens: input.maxTokens ?? 1200,
+      ...this.extraBody(),
     };
     if (input.json) {
       body.response_format = { type: 'json_object' };
@@ -102,12 +115,27 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
     }
 
     const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
 
-    const content = data.choices?.[0]?.message?.content;
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content;
     if (!content) {
+      /*
+       * Vazio com finish_reason "length" nao e o mesmo defeito que vazio puro,
+       * e a diferenca e a unica pista que o log guarda. O modelo de raciocinio
+       * gastou o teto inteiro pensando e nao sobrou token para a resposta --
+       * quem ler "resposta sem conteudo" vai procurar defeito no prompt, que
+       * esta certo. O que falta e teto, ou raciocinio desligado.
+       */
+      if (choice?.finish_reason === 'length') {
+        throw new AiProviderError(
+          this.name,
+          'resposta vazia por estouro de tokens: o raciocinio do modelo consumiu todo o max_tokens ' +
+            'antes de escrever a resposta. Aumente maxTokens ou desligue o raciocinio deste provider.',
+        );
+      }
       throw new AiProviderError(this.name, 'resposta sem conteudo');
     }
 
