@@ -111,10 +111,22 @@ export function Layout({ children }: { children: ReactNode }) {
               "min. hoje" e "min. no total", o que era simplesmente errado: o
               campo sempre foi XP, nunca minuto.
             */}
-            <div className="flex flex-1 items-center justify-end gap-3 sm:gap-4">
+            {/*
+              Tres indicadores nao cabem num aparelho de 360px -- por isso o
+              terceiro so aparece a partir do `sm`, que e a mesma defesa que o
+              cabecalho ja usava antes. Sequencia e nivel ficam sempre: sao os
+              dois que respondem "estou indo bem?" e "falta quanto?". O XP do
+              dia e derivavel dos outros dois e por isso e o que cede.
+            */}
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:gap-4">
               <Score value={data ? `${data.streak.current}` : '—'} label="seguidos" tone="text-bee" />
-              <span className="h-6 w-px bg-swan" aria-hidden />
-              <Score value={data ? `${data.xp.today}` : '—'} label="XP hoje" tone="text-grass" />
+              <span className="hidden h-6 w-px bg-swan sm:block" aria-hidden />
+              <Score
+                value={data ? `${data.xp.today}` : '—'}
+                label="XP hoje"
+                tone="text-grass"
+                className="hidden sm:flex"
+              />
               <span className="h-6 w-px bg-swan" aria-hidden />
               <LevelPill progress={data?.xp.progress} />
             </div>

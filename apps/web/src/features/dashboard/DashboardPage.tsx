@@ -88,7 +88,17 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="relative">
+        {/*
+          O `px-6` e o corredor do ziguezague, nao respiro visual.
+
+          Os nos sao `w-full` e se deslocam 24px para cada lado; sem reservar
+          esses 24px aqui, o no deslocado para a direita termina 24px FORA da
+          largura da tela e o celular passa a arrastar de lado. O `overflow-x:
+          clip` do documento esconderia o sintoma, e esconder layout quebrado
+          nao e conserta-lo -- o toque continuaria caindo fora do botao na
+          faixa cortada.
+        */}
+        <div className="relative px-6">
           {session.activities.map((activity, index) => (
             <TrailNode
               key={activity.id}
@@ -199,13 +209,14 @@ function LevelBanner({
                 aria-hidden
               />
             </div>
+            {/* "para o nível 8" saiu: o nivel ja esta escrito grande logo
+                acima, e a frase inteira quebrava linha num aparelho estreito,
+                deixando o numero do nivel sozinho embaixo. */}
             <p className="mt-1.5 text-[11px] text-hare">
               <span className="stat">{progress.xpIntoLevel}</span>
               <span className="text-hare">/{progress.xpForLevel} XP</span>
               {' · faltam '}
               <span className="stat">{progress.xpRemaining}</span>
-              {' para o nível '}
-              {progress.level + 1}
             </p>
           </div>
         </div>
@@ -336,7 +347,15 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
   );
 
   return (
-    <div className="card space-y-3.5">
+    /*
+      O `min-w-0` nao e enfeite: item de grade nasce com `min-width: auto`, e
+      isso o impede de encolher abaixo da largura MINIMA do conteudo. Como o
+      card tem varios `truncate` -- e `truncate` e `white-space: nowrap` --, a
+      largura minima dele passa a ser a do texto inteiro sem quebra. O card
+      entao estoura a coluna, empurra a pagina e o celular comeca a arrastar de
+      lado. Zerar o minimo devolve ao `truncate` o direito de cortar.
+    */
+    <div className="card min-w-0 space-y-3.5">
       <div className="flex items-center gap-3">
         <span
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 font-mono text-lg font-bold ${theme.soft} ${theme.border} ${theme.text}`}
@@ -384,7 +403,9 @@ function LanguageCard({ language }: { language: DashboardLanguage }) {
           <ul className="space-y-1">
             {language.topErrors.map((error) => (
               <li key={error.id} className="flex items-baseline justify-between gap-2 text-xs text-eel">
-                <span className="truncate">{error.description}</span>
+                {/* Mesma razao do `min-w-0` do card, um nivel abaixo: sem ele
+                    este `truncate` nunca corta, so alarga a linha. */}
+                <span className="min-w-0 truncate">{error.description}</span>
                 <span className="shrink-0 font-mono text-cardinal">{error.occurrenceCount}×</span>
               </li>
             ))}

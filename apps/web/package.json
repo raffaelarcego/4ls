@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "vercel-build": "npm run build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:layout": "node tools/check-layout.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.69.0",
@@ -22,6 +23,7 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
+    "playwright": "^1.56.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",
