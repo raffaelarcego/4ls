@@ -1,3 +1,4 @@
+import '../src/common/timezone';
 import { PrismaClient } from '@prisma/client';
 
 /**

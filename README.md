@@ -186,6 +186,7 @@ A raiz do domínio da API serve `public/index.html`, uma página estática. Ela 
 - **Engine do Prisma.** `binaryTargets = ["native", "rhel-openssl-3.0.x"]`. Sem o alvo Linux o build passa e *toda query falha em produção*.
 - **Corpo de 4.5 MB.** O áudio do Speaking Lab vai em base64, então o teto é 3 MB de áudio (~4 MB codificado). O gravador para sozinho em 90 s, o que dá ~1,5 MB.
 - **Duração da função.** `maxDuration: 60`. O padrão de 10 s cortaria no meio uma avaliação de fala ou escrita no modelo forte, que leva ~16 s.
+- **Fuso do servidor.** A Vercel roda em UTC, e o sistema decide o dia com hora local (`setHours(0, 0, 0, 0)`). Sem correção o dia virava às 21h de Brasília: estudar às 22h contava para amanhã e o streak podia quebrar numa noite em que você estudou. `src/common/timezone.ts` fixa `process.env.TZ` em UTC-3 e é o **primeiro import** de todo ponto de entrada — `main.ts`, `serverless.ts` e os scripts de `prisma/`. Um entrypoint novo que esquecer esse import volta silenciosamente para UTC.
 
 ### Migrations
 

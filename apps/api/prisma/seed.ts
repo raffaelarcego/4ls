@@ -1,3 +1,4 @@
+import '../src/common/timezone';
 import { CefrLevel, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

@@ -1,3 +1,4 @@
+import './common/timezone';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';

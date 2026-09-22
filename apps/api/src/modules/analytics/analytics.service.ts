@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { appDayKey } from '../../common/timezone';
 
 @Injectable()
 export class AnalyticsService {
@@ -36,7 +37,10 @@ export class AnalyticsService {
 
     const byDay = new Map<string, { xp: number; seconds: number }>();
     for (const s of sessions) {
-      const key = s.date.toISOString().slice(0, 10);
+      // Dia do aluno (UTC-3), nao dia UTC: uma sessao das 22h de terca
+      // apareceria na quarta, e a consistencia contaria dois dias ativos onde
+      // houve um.
+      const key = appDayKey(s.date);
       const entry = byDay.get(key) ?? { xp: 0, seconds: 0 };
       entry.xp += s.xpEarned;
       entry.seconds += s.durationSeconds;
