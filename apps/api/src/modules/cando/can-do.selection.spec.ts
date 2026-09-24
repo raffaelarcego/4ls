@@ -6,6 +6,7 @@ import {
   canDoMastery,
   lowestCanDoLevel,
   pickCanDo,
+  rankCanDos,
   toProgressRows,
 } from './can-do.selection';
 
@@ -133,5 +134,37 @@ describe('leitura do progresso', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].canDoId).toBe('negar');
+  });
+});
+
+/**
+ * A fila inteira, e nao so o primeiro colocado, e o que permite a sessao servir
+ * a segunda can-do quando a primeira ainda nao foi preparada -- em vez de
+ * responder 503 no meio do estudo, que foi o defeito real.
+ */
+describe('fila de can-dos', () => {
+  it('comeca pela mesma que `pickCanDo` escolheria', () => {
+    const candidates = canDoCandidates(['A1']);
+    const rows = [row({ canDoId: candidates[0].id, mastery: 10 })];
+
+    expect(rankCanDos(candidates, rows, 4)[0]).toBe(pickCanDo(candidates, rows, 4));
+  });
+
+  it('devolve todas as candidatas, para haver a quem recorrer', () => {
+    const candidates = canDoCandidates(['A1']);
+
+    expect(rankCanDos(candidates, [], 4)).toHaveLength(candidates.length);
+  });
+
+  it('poe as ja estudadas depois das que ele nunca viu', () => {
+    const candidates = canDoCandidates(['A1']);
+    const studied = candidates[0];
+    const ranked = rankCanDos(
+      candidates,
+      [row({ canDoId: studied.id, mastery: 90 })],
+      4,
+    );
+
+    expect(ranked[ranked.length - 1].id).toBe(studied.id);
   });
 });

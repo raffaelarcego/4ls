@@ -16,16 +16,24 @@ import {
   canDoCandidates,
   canDoMastery,
   lowestCanDoLevel,
-  pickCanDo,
+  rankCanDos,
   toProgressRows,
   topicIdsFor,
 } from './can-do.selection';
 
 /**
- * Quantas aulas distintas manter por (can-do, nivel) antes de reaproveitar.
- * Mesma conta dos outros pools: tres ja evitam que ele decore os exemplos.
+ * Quantas can-dos DISTINTAS manter prontas a frente do aluno. Mesma correcao
+ * do bloco de estrutura: `rankCanDos` poe can-do nunca estudada na frente de
+ * qualquer uma ja vista, entao tres copias da primeira nao impedem que a
+ * SEGUNDA chegue vazia no dia seguinte -- que era o defeito.
  */
-const POOL_TARGET = 3;
+const POOL_AHEAD = 3;
+
+/**
+ * Copias da mesma can-do, para quando o catalogo do nivel ja estiver todo
+ * preparado. So ai a escolha volta a can-dos ja vistas e a variacao importa.
+ */
+const POOL_DEPTH = 3;
 
 /** Frases-modelo por aula. Tres ideias, cada uma realizada nos quatro idiomas. */
 const SENTENCES_PER_LESSON = 3;
@@ -98,7 +106,8 @@ export class CanDoService {
     }
 
     const rows = await this.progressRows(userId, candidates);
-    const canDo = pickCanDo(candidates, rows, languages.length)!;
+    const ranked = rankCanDos(candidates, rows, languages.length);
+    const canDo = await this.firstPrepared(ranked, level);
     const content = await this.fromPool(canDo, level);
 
     return {
@@ -124,13 +133,62 @@ export class CanDoService {
   }
 
   /**
-   * Enche o pool da proxima can-do de que o aluno vai precisar.
+   * A primeira can-do da fila que JA TEM aula pronta.
+   *
+   * Descer a fila e a diferenca entre praticar uma funcao comunicativa menos
+   * urgente e nao praticar nenhuma. O aviso no log e o que denuncia atraso do
+   * `warm()` -- se ele aparece todos os dias, o quebrado e o agendamento.
+   */
+  private async firstPrepared(ranked: CanDo[], level: string): Promise<CanDo> {
+    if (ranked.length === 0) {
+      throw new NotFoundException(`Ainda nao ha can-do para o nivel ${level}.`);
+    }
+
+    const prepared = await this.preparedIds(ranked, level);
+    const canDo = ranked.find((c) => prepared.has(c.id));
+
+    if (!canDo) {
+      throw new ServiceUnavailableException(
+        `A aula de "${ranked[0].question}" nos quatro idiomas ainda não foi preparada. ` +
+          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
+      );
+    }
+
+    if (canDo.id !== ranked[0].id) {
+      this.logger.warn(
+        `Can-do ideal "${ranked[0].id}" sem aula pronta em ${level}; servindo "${canDo.id}". ` +
+          'O warm-content esta atrasado.',
+      );
+    }
+
+    return canDo;
+  }
+
+  /** Quais destas can-dos ja tem pelo menos uma aula no pool. */
+  private async preparedIds(canDos: CanDo[], level: string): Promise<Set<string>> {
+    if (canDos.length === 0) return new Set();
+
+    const rows = await this.prisma.canDoLesson.findMany({
+      where: { level, canDoId: { in: canDos.map((c) => c.id) } },
+      select: { canDoId: true },
+      distinct: ['canDoId'],
+    });
+
+    return new Set(rows.map((r) => r.canDoId));
+  }
+
+  /**
+   * Prepara as proximas can-dos de que o aluno vai precisar.
+   *
+   * Largura primeiro, pela mesma razao do bloco de estrutura: UMA aula para
+   * cada uma das proximas `ahead` can-dos da fila, e so com o catalogo do
+   * nivel inteiro coberto e que vale aprofundar a primeira ate `POOL_DEPTH`.
    *
    * Roda fora do horario de estudo (script/cron), onde alguns minutos por aula
    * nao incomodam ninguem. Gera so o que falta: idempotente e de graca quando o
    * pool ja esta cheio.
    */
-  async warm(userId: string, target = POOL_TARGET): Promise<number> {
+  async warm(userId: string, ahead = POOL_AHEAD): Promise<number> {
     const { languages, level } = await this.learner(userId).catch(() => ({
       languages: [],
       level: 'A1' as const,
@@ -141,8 +199,31 @@ export class CanDoService {
     if (candidates.length === 0) return 0;
 
     const rows = await this.progressRows(userId, candidates);
-    const canDo = pickCanDo(candidates, rows, languages.length)!;
+    const ranked = rankCanDos(candidates, rows, languages.length);
+    const prepared = await this.preparedIds(ranked, level);
 
+    const missing = ranked.filter((c) => !prepared.has(c.id));
+    let created = 0;
+
+    for (const canDo of missing.slice(0, ahead)) {
+      created += await this.fill(userId, canDo, level, languages, 1);
+    }
+
+    if (missing.length === 0) {
+      created += await this.fill(userId, ranked[0], level, languages, POOL_DEPTH);
+    }
+
+    return created;
+  }
+
+  /** Gera aulas da can-do ate o pool dela chegar a `target`. */
+  private async fill(
+    userId: string,
+    canDo: CanDo,
+    level: string,
+    languages: Array<{ code: string; name: string; level: string }>,
+    target: number,
+  ): Promise<number> {
     const where = { canDoId: canDo.id, level };
     const existing = await this.prisma.canDoLesson.count({ where });
     let created = 0;
@@ -159,7 +240,7 @@ export class CanDoService {
         },
       });
       created += 1;
-      this.logger.log(`Aula de can-do preparada: ${canDo.id}/${level} (${created}/${target}).`);
+      this.logger.log(`Aula de can-do preparada: ${canDo.id}/${level} (${i + 1}/${target}).`);
     }
 
     return created;
@@ -247,7 +328,9 @@ export class CanDoService {
   /**
    * A aula pronta, do pool.
    *
-   * Basta UMA para servir. Encher ate `POOL_TARGET` e trabalho do `warm()`.
+   * Basta UMA para servir, e quem escolheu ja garantiu que ela existe: o 503
+   * daqui e so rede de seguranca contra corrida. Encher o pool e trabalho do
+   * `warm()`.
    */
   private async fromPool(canDo: CanDo, level: string) {
     const reused = await this.prisma.canDoLesson.findFirst({

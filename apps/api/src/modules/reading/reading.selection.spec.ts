@@ -3,6 +3,7 @@ import { ReadingTopic } from './reading.catalog';
 import {
   lowestReadingLevel,
   pickReadingTopic,
+  rankReadingTopics,
   readInLanguages,
   readingCandidates,
   ReadingProgressRow,
@@ -126,5 +127,40 @@ describe('leitura pelos outros idiomas', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].topicId).toBe('segundo');
+  });
+});
+
+/**
+ * A sessao desce esta fila ate achar um texto ja preparado. Sem a fila inteira
+ * ela so tinha o primeiro colocado -- e no dia em que o `warm` ficava para
+ * tras, o bloco de leitura morria com 503 em vez de servir o texto seguinte.
+ */
+describe('fila de textos', () => {
+  it('comeca pelo mesmo que `pickReadingTopic` escolheria', () => {
+    const candidates = [topic('primeiro'), topic('segundo')];
+    const rows = [row('segundo', 'en')];
+
+    expect(rankReadingTopics(candidates, rows, 'de')[0]).toBe(
+      pickReadingTopic(candidates, rows, 'de'),
+    );
+  });
+
+  it('poe no fim os ja lidos NESTE idioma, e nao os deixa de fora', () => {
+    const candidates = [topic('primeiro'), topic('segundo'), topic('terceiro')];
+    const ranked = rankReadingTopics(candidates, [row('primeiro', 'de')], 'de');
+
+    expect(ranked).toHaveLength(3);
+    expect(ranked[ranked.length - 1].id).toBe('primeiro');
+  });
+
+  it('com o catalogo esgotado no idioma, volta o mais antigo primeiro', () => {
+    const candidates = [topic('primeiro'), topic('segundo')];
+    const ranked = rankReadingTopics(
+      candidates,
+      [row('primeiro', 'de', 2), row('segundo', 'de', 10)],
+      'de',
+    );
+
+    expect(ranked.map((t) => t.id)).toEqual(['segundo', 'primeiro']);
   });
 });

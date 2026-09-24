@@ -17,12 +17,24 @@ import {
 } from './sentence-patterns.catalog';
 
 /**
- * Quantas aulas distintas manter por (idioma, nivel, padrao) antes de
- * reaproveitar. Tres ja da variacao de frases suficiente para o aluno nao
- * decorar os exemplos, e custa tres geracoes uma unica vez -- mesma logica dos
- * pools de listening e de drills de gramatica.
+ * Quantos padroes DISTINTOS manter prontos a frente do aluno.
+ *
+ * Largura, e nao profundidade -- e a correcao de um defeito que quebrava a
+ * sessao toda vez que ele avancava. O pool guardava tres copias do MESMO
+ * padrao, mas `pickPattern` poe padrao nunca estudado na frente de qualquer um
+ * ja visto: no instante em que ele terminava o padrao preparado, a escolha
+ * pulava para o proximo, com pool zero, e o bloco morria com 503. As outras
+ * duas copias so serviriam depois do catalogo inteiro visto.
  */
-const POOL_TARGET = 3;
+const POOL_AHEAD = 3;
+
+/**
+ * Copias do mesmo padrao, para quando o catalogo do nivel ja estiver todo
+ * preparado. So ai a profundidade serve para alguma coisa: com tudo visto, a
+ * escolha volta a padroes ja estudados e tres versoes evitam que ele decore os
+ * exemplos.
+ */
+const POOL_DEPTH = 3;
 
 /** Exercicios de montagem por aula. */
 const DRILLS_PER_LESSON = 5;
@@ -116,7 +128,8 @@ export class StructureService {
       );
     }
 
-    const pattern = await this.pickPattern(userId, languageCode, candidates);
+    const ranked = await this.rankPatterns(userId, languageCode, candidates);
+    const pattern = await this.firstPrepared(ranked, userLanguage.currentLevel);
     const content = await this.fromPool(pattern, userLanguage.currentLevel);
 
     const progress = await this.prisma.grammarProgress.findUnique({
@@ -144,12 +157,19 @@ export class StructureService {
     };
   }
 
-  /** Padrao com menor dominio; empate desfeito pelo que faz mais tempo. */
-  private async pickPattern(
+  /**
+   * Os padroes em ordem de necessidade: o menos dominado primeiro, empate
+   * desfeito pelo que faz mais tempo.
+   *
+   * Devolve a lista INTEIRA, e nao so o primeiro, porque duas coisas precisam
+   * dela: a sessao, que desce a lista ate achar um padrao preparado, e o
+   * `warm()`, que prepara os proximos da fila.
+   */
+  private async rankPatterns(
     userId: string,
     languageCode: string,
     candidates: SentencePattern[],
-  ): Promise<SentencePattern> {
+  ): Promise<SentencePattern[]> {
     const progress = await this.prisma.grammarProgress.findMany({
       where: {
         userId,
@@ -173,7 +193,59 @@ export class StructureService {
       return pa!.lastStudiedAt.getTime() - pb!.lastStudiedAt.getTime();
     });
 
-    return ranked[0];
+    return ranked;
+  }
+
+  /**
+   * O primeiro padrao da fila que JA TEM aula pronta.
+   *
+   * A sessao desce a fila em vez de exigir o primeiro colocado, e essa e a
+   * diferenca entre uma aula menos ideal e bloco nenhum. O padrao ideal so fica
+   * sem conteudo quando o `warm()` esta atrasado -- e nesse dia servir o
+   * segundo da fila ensina muito mais que uma tela de erro.
+   *
+   * O aviso no log existe para o atraso nao passar despercebido: se ele aparece
+   * todo dia, quem esta quebrado e o agendamento do `warm()`, nao a aula.
+   */
+  private async firstPrepared(
+    ranked: SentencePattern[],
+    level: string,
+  ): Promise<SentencePattern> {
+    const prepared = await this.preparedIds(ranked, level);
+    const pattern = ranked.find((p) => prepared.has(p.id));
+
+    if (!pattern) {
+      throw new ServiceUnavailableException(
+        `A aula de estrutura de ${ranked[0].languageCode} ainda não foi preparada. ` +
+          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
+      );
+    }
+
+    if (pattern.id !== ranked[0].id) {
+      this.logger.warn(
+        `Padrao ideal "${ranked[0].id}" sem aula pronta em ${level}; servindo "${pattern.id}". ` +
+          'O warm-content esta atrasado.',
+      );
+    }
+
+    return pattern;
+  }
+
+  /** Quais destes padroes ja tem pelo menos uma aula no pool. */
+  private async preparedIds(patterns: SentencePattern[], level: string): Promise<Set<string>> {
+    if (patterns.length === 0) return new Set();
+
+    const rows = await this.prisma.sentencePattern.findMany({
+      where: {
+        languageCode: patterns[0].languageCode,
+        level,
+        patternId: { in: patterns.map((p) => p.id) },
+      },
+      select: { patternId: true },
+      distinct: ['patternId'],
+    });
+
+    return new Set(rows.map((r) => r.patternId));
   }
 
   /**
@@ -181,8 +253,12 @@ export class StructureService {
    *
    * Basta UMA no pool para servir; antes so reaproveitava com o pool cheio
    * (tres) e gerava nas duas primeiras vezes -- ou seja, justamente quando o
-   * aluno estava esperando. Encher ate `POOL_TARGET` continua valendo, mas e
-   * trabalho do `warm()`, que roda fora do estudo.
+   * aluno estava esperando. Encher o pool e trabalho do `warm()`, que roda
+   * fora do estudo.
+   *
+   * O 503 daqui e rede de seguranca contra corrida (a aula some entre a
+   * consulta e o uso); o caminho normal ja escolheu um padrao preparado em
+   * `firstPrepared`.
    */
   private async fromPool(pattern: SentencePattern, level: string) {
     const where = { languageCode: pattern.languageCode, level, patternId: pattern.id };
@@ -210,13 +286,19 @@ export class StructureService {
   }
 
   /**
-   * Enche o pool do proximo padrao de que o aluno vai precisar neste idioma.
+   * Prepara os proximos padroes de que o aluno vai precisar neste idioma.
+   *
+   * Largura primeiro: garante UMA aula para cada um dos proximos `ahead`
+   * padroes da fila. So quando o catalogo do nivel inteiro ja tem aula e que
+   * vale aprofundar o primeiro colocado ate `POOL_DEPTH` -- antes disso a
+   * escolha do dia nunca volta a um padrao ja visto, e as copias extras ficam
+   * paradas no banco enquanto o padrao seguinte quebra a sessao.
    *
    * Roda fora do horario de estudo (script/cron), onde dois minutos por aula
    * nao incomodam ninguem. Gera so o que falta: e idempotente e barato quando
    * o pool ja esta cheio.
    */
-  async warm(userId: string, languageCode: string, target = POOL_TARGET): Promise<number> {
+  async warm(userId: string, languageCode: string, ahead = POOL_AHEAD): Promise<number> {
     const userLanguage = await this.prisma.userLanguage.findFirst({
       where: { userId, language: { code: languageCode } },
     });
@@ -226,9 +308,33 @@ export class StructureService {
     const candidates = patternsFor(languageCode, level);
     if (candidates.length === 0) return 0;
 
-    const pattern = await this.pickPattern(userId, languageCode, candidates);
-    const where = { languageCode, level, patternId: pattern.id };
+    const ranked = await this.rankPatterns(userId, languageCode, candidates);
+    const prepared = await this.preparedIds(ranked, level);
 
+    const missing = ranked.filter((p) => !prepared.has(p.id));
+    let created = 0;
+
+    for (const pattern of missing.slice(0, ahead)) {
+      created += await this.fill(userId, pattern, level, 1);
+    }
+
+    // Catalogo do nivel inteiro coberto: agora sim a profundidade serve, porque
+    // a escolha do dia passou a devolver padroes ja estudados.
+    if (missing.length === 0) {
+      created += await this.fill(userId, ranked[0], level, POOL_DEPTH);
+    }
+
+    return created;
+  }
+
+  /** Gera aulas do padrao ate o pool dele chegar a `target`. */
+  private async fill(
+    userId: string,
+    pattern: SentencePattern,
+    level: string,
+    target: number,
+  ): Promise<number> {
+    const where = { languageCode: pattern.languageCode, level, patternId: pattern.id };
     const existing = await this.prisma.sentencePattern.count({ where });
     let created = 0;
 
@@ -248,7 +354,7 @@ export class StructureService {
         },
       });
       created += 1;
-      this.logger.log(`Aula de estrutura preparada: ${pattern.id}/${level} (${created}/${target}).`);
+      this.logger.log(`Aula de estrutura preparada: ${pattern.id}/${level} (${i + 1}/${target}).`);
     }
 
     return created;

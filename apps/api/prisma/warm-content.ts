@@ -22,11 +22,17 @@ import { MorphologyService } from '../src/modules/morphology/morphology.service'
  * ele pode demorar o quanto precisar porque ninguem esta esperando.
  *
  *   npm run content:warm -w @4l/api
- *   npm run content:warm -w @4l/api -- --language=ru --target=1
+ *   npm run content:warm -w @4l/api -- --language=ru --ahead=1
  *   npm run content:warm -w @4l/api -- --email=alguem@exemplo.com
  *
- * Idempotente: so gera o que falta para o pool chegar ao alvo. Rodar de novo
- * com tudo cheio nao custa nenhuma chamada de IA.
+ * `--ahead` e quantos itens DISTINTOS deixar prontos a frente do aluno (padrao
+ * 3), e nao quantas copias do mesmo item. A diferenca importa: os seletores
+ * poem item nunca estudado na frente de qualquer um ja visto, entao encher de
+ * copias do item de hoje nao impede que o de amanha chegue vazio -- que era
+ * exatamente o defeito que quebrava os blocos de estrutura e can-do.
+ *
+ * Idempotente: so gera o que falta. Rodar de novo com tudo preparado nao custa
+ * nenhuma chamada de IA.
  *
  * Compila antes de rodar (`nest build`) em vez de usar tsx, como o
  * `db:backfill-concepts`: este script sobe o container do Nest, e o tsx nao
@@ -43,7 +49,8 @@ async function main() {
   const logger = new Logger('warm-content');
   const onlyLanguage = arg('language');
   const onlyEmail = arg('email');
-  const target = Number(arg('target') ?? 3);
+  // `--target` continua aceito porque e o que esta no historico do terminal.
+  const ahead = Number(arg('ahead') ?? arg('target') ?? 3);
 
   // 'log' precisa entrar: o progresso deste script sai por ele, e sem isso a
   // execucao fica muda por varios minutos sem ninguem saber se esta viva.
@@ -78,10 +85,11 @@ async function main() {
     for (const code of languages) {
       const started = Date.now();
       try {
-        // `warm` escolhe sozinho o proximo padrao de que este aluno precisa --
-        // o menos dominado --, entao preparar "o proximo" é sempre preparar o
-        // que ele vai receber de verdade, e nao um padrao qualquer do catalogo.
-        const created = await structure.warm(user.id, code, target);
+        // `warm` escolhe sozinho os proximos padroes de que este aluno precisa
+        // -- os menos dominados --, entao preparar "os proximos" é sempre
+        // preparar o que ele vai receber de verdade, e nao padroes quaisquer do
+        // catalogo.
+        const created = await structure.warm(user.id, code, ahead);
         generated += created;
         const seconds = Math.round((Date.now() - started) / 1000);
         logger.log(
@@ -127,7 +135,7 @@ async function main() {
 
     const startedCanDo = Date.now();
     try {
-      const created = await cando.warm(user.id, target);
+      const created = await cando.warm(user.id, ahead);
       generated += created;
       const seconds = Math.round((Date.now() - startedCanDo) / 1000);
       logger.log(
@@ -144,12 +152,9 @@ async function main() {
      * O texto de leitura segue a can-do, e pela mesma razao: ele e o MESMO nos
      * quatro idiomas, entao nao pertence a nenhum e sai de uma geracao so.
      *
-     * `target` nao entra aqui de proposito. Nos outros blocos ele e o tamanho
-     * do pool -- quantas aulas diferentes do mesmo assunto manter para o aluno
-     * nao decorar os exemplos. Na leitura isso seria trabalhar contra o modulo:
-     * ele existe justamente para o MESMO texto voltar depois em outro idioma. A
-     * variedade vem do catalogo, e o `warm` prepara o proximo texto de cada
-     * idioma, sem repetir os que ja estao prontos.
+     * `--ahead` nao entra aqui de proposito: o `warm` da leitura tem folga
+     * propria (menor, porque cada texto custa quatro idiomas numa resposta so)
+     * e prepara os proximos textos de CADA idioma, sem repetir os prontos.
      */
     const startedReading = Date.now();
     try {

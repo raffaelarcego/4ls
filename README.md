@@ -38,14 +38,31 @@ npm run db:merge-concepts -- <origem> <destino>   # funde dois conceitos que sao
 npm run db:rewind -- 1                           # empurra as sessoes um dia para tras (dev)
 ```
 
-`content:warm` é o único que precisa rodar com alguma regularidade. As aulas de
-estrutura, as can-dos e os **textos de leitura** não são gerados durante a
-sessão: quatro idiomas numa resposta só levam minutos, e a função da Vercel
-morre aos 60s — o aluno recebia "network error" no meio do estudo. A sessão só
-lê conteúdo pronto, e quem paga o custo é este script, fora do horário de
-estudo. É idempotente: rodar com tudo preparado não custa nenhuma chamada de IA.
-Bloco cujo conteúdo ainda não foi preparado responde 503 dizendo exatamente
-isso.
+`content:warm` é o único que precisa rodar com alguma regularidade — e por isso
+ele **roda sozinho todo dia às 05:00 de Brasília**, pelo workflow
+`.github/workflows/warm-content.yml`. Ele precisa dos segredos `DATABASE_URL`,
+`DIRECT_DATABASE_URL`, `MIMO_API_KEY` e `OPENROUTER_API_KEY` no repositório
+(Settings → Secrets → Actions); sem eles o job falha e o conteúdo não é
+preparado. A variável opcional `WARM_EMAIL` (Settings → Variables → Actions)
+limita a preparação a uma conta — sem ela o script prepara todos os usuários do
+banco, e conta de teste custa geração de verdade. Dá para disparar na mão pela
+aba Actions depois de mexer no catálogo.
+
+As aulas de estrutura, as can-dos e os **textos de leitura** não são gerados
+durante a sessão: quatro idiomas numa resposta só levam minutos, e a função da
+Vercel morre aos 60s — o aluno recebia "network error" no meio do estudo. A
+sessão só lê conteúdo pronto, e quem paga o custo é este script, fora do horário
+de estudo. É idempotente: rodar com tudo preparado não custa nenhuma chamada de
+IA.
+
+O script prepara **largura, não profundidade**: `--ahead` (padrão 3) é quantos
+assuntos *distintos* deixar prontos à frente do aluno. Isso é o que impede a
+falha que derrubava os blocos de estrutura e de contraste — os seletores põem
+assunto nunca estudado na frente de qualquer um já visto, então encher o pool
+com três cópias da aula de hoje não impedia que a de amanhã chegasse vazia. E
+quando o assunto ideal não está pronto, a sessão **desce a fila** e serve o
+melhor assunto preparado, registrando um aviso no log; 503 só quando não há
+absolutamente nada preparado naquele nível.
 
 `db:enroll-languages` existe porque o cadastro matricula nos idiomas do momento e
 nunca mais volta ao assunto: quando o russo entrou, quem ja tinha conta ficou sem

@@ -88,7 +88,23 @@ export function pickCanDo(
   rows: CanDoProgressRow[],
   languageCount: number,
 ): CanDo | undefined {
-  if (candidates.length === 0) return undefined;
+  return rankCanDos(candidates, rows, languageCount)[0];
+}
+
+/**
+ * A mesma fila de `pickCanDo`, inteira.
+ *
+ * Existe porque duas coisas precisam da fila, e nao so do primeiro colocado: a
+ * sessao, que desce ate achar uma can-do com aula pronta em vez de morrer com
+ * 503, e o `warm()`, que prepara as proximas da fila em vez de tres copias da
+ * primeira.
+ */
+export function rankCanDos(
+  candidates: CanDo[],
+  rows: CanDoProgressRow[],
+  languageCount: number,
+): CanDo[] {
+  if (candidates.length === 0) return [];
 
   const seen = new Set(rows.map((r) => r.canDoId));
   const lastStudied = new Map<string, number>();
@@ -109,7 +125,7 @@ export function pickCanDo(
     if (ma !== mb) return ma - mb;
 
     return (lastStudied.get(a.id) ?? 0) - (lastStudied.get(b.id) ?? 0);
-  })[0];
+  });
 }
 
 /** As linhas de `grammar_progress` das can-dos, ja sem o prefixo do topico. */

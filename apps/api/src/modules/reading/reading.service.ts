@@ -20,7 +20,7 @@ import {
 } from './reading.catalog';
 import {
   lowestReadingLevel,
-  pickReadingTopic,
+  rankReadingTopics,
   readInLanguages,
   readingCandidates,
   readingTopicIdsFor,
@@ -29,6 +29,17 @@ import {
 
 /** Perguntas de compreensao por versao. */
 const QUESTIONS_PER_VERSION = 3;
+
+/**
+ * Quantos textos DISTINTOS manter prontos a frente do aluno.
+ *
+ * O `warm()` preparava so o texto de hoje, e por isso a sessao quebrava no dia
+ * em que ele terminava esse texto nos quatro idiomas: a escolha andava para o
+ * proximo do catalogo, que ninguem tinha gerado. Dois textos de folga cobrem a
+ * virada sem gerar catalogo inteiro de uma vez -- e cada texto destes custa
+ * quatro idiomas numa resposta so.
+ */
+const TOPICS_AHEAD = 2;
 
 /** Peso do resultado novo na media movel de dominio. Igual ao dos outros blocos. */
 const MASTERY_WEIGHT = 0.3;
@@ -121,7 +132,8 @@ export class ReadingService {
     }
 
     const rows = await this.progressRows(userId, candidates);
-    const topic = pickReadingTopic(candidates, rows, languageCode)!;
+    const ranked = rankReadingTopics(candidates, rows, languageCode);
+    const topic = await this.firstPrepared(ranked, level);
     const { versions, contrast } = await this.fromPool(topic, level);
 
     const version = versions.find((v) => v.languageCode === languageCode);
@@ -207,8 +219,14 @@ export class ReadingService {
      */
     const wanted = new Map<string, ReadingTopic>();
     for (const language of languages) {
-      const topic = pickReadingTopic(candidates, rows, language.code);
-      if (topic) wanted.set(topic.id, topic);
+      // Os PROXIMOS, no plural: preparar so o texto de hoje deixava a sessao
+      // sem conteudo exatamente no dia em que ele virava a pagina.
+      for (const topic of rankReadingTopics(candidates, rows, language.code).slice(
+        0,
+        TOPICS_AHEAD,
+      )) {
+        wanted.set(topic.id, topic);
+      }
     }
 
     let created = 0;
@@ -319,6 +337,43 @@ export class ReadingService {
       where: { userId, topicId: { in: readingTopicIdsFor(candidates) } },
     });
     return toReadingRows(rows);
+  }
+
+  /**
+   * O primeiro texto da fila que JA ESTA preparado.
+   *
+   * Descer a fila e a diferenca entre ler uma historia menos ideal e nao ler
+   * nada. O aviso no log denuncia atraso do `warm()`: se aparece todo dia, o
+   * quebrado e o agendamento, nao o catalogo.
+   */
+  private async firstPrepared(ranked: ReadingTopic[], level: string): Promise<ReadingTopic> {
+    if (ranked.length === 0) {
+      throw new NotFoundException(`Ainda nao ha texto de leitura para o nivel ${level}.`);
+    }
+
+    const rows = await this.prisma.readingPassage.findMany({
+      where: { level, topicId: { in: ranked.map((t) => t.id) } },
+      select: { topicId: true },
+      distinct: ['topicId'],
+    });
+    const prepared = new Set(rows.map((r) => r.topicId));
+    const topic = ranked.find((t) => prepared.has(t.id));
+
+    if (!topic) {
+      throw new ServiceUnavailableException(
+        `O texto "${ranked[0].title}" nos quatro idiomas ainda não foi preparado. ` +
+          'Rode "npm run content:warm -w @4l/api" para gerá-lo.',
+      );
+    }
+
+    if (topic.id !== ranked[0].id) {
+      this.logger.warn(
+        `Texto ideal "${ranked[0].id}" sem versao pronta em ${level}; servindo "${topic.id}". ` +
+          'O warm-content esta atrasado.',
+      );
+    }
+
+    return topic;
   }
 
   private async fromPool(topic: ReadingTopic, level: string) {

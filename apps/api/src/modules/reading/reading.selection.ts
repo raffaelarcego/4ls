@@ -85,7 +85,22 @@ export function pickReadingTopic(
   rows: ReadingProgressRow[],
   languageCode: string,
 ): ReadingTopic | undefined {
-  if (candidates.length === 0) return undefined;
+  return rankReadingTopics(candidates, rows, languageCode)[0];
+}
+
+/**
+ * A mesma fila de `pickReadingTopic`, inteira.
+ *
+ * A sessao desce a fila ate achar um texto ja preparado, em vez de exigir o
+ * primeiro colocado e morrer com 503 quando o `warm()` ficou para tras; e o
+ * `warm()` usa a fila para preparar os PROXIMOS textos, e nao so o de hoje.
+ */
+export function rankReadingTopics(
+  candidates: ReadingTopic[],
+  rows: ReadingProgressRow[],
+  languageCode: string,
+): ReadingTopic[] {
+  if (candidates.length === 0) return [];
 
   const order = new Map(candidates.map((topic, index) => [topic.id, index]));
   const here = new Map<string, number>();
@@ -106,12 +121,13 @@ export function pickReadingTopic(
 
   const fresh = candidates.filter((topic) => !here.has(topic.id));
 
-  // Catalogo esgotado neste idioma: volta o mais antigo, e nao o mais coberto.
-  if (fresh.length === 0) {
-    return [...candidates].sort((a, b) => (here.get(a.id) ?? 0) - (here.get(b.id) ?? 0))[0];
-  }
+  // Ja lidos neste idioma: reler depois de meses e leitura legitima, mas fica
+  // no fim da fila -- o mais antigo primeiro.
+  const reread = candidates
+    .filter((topic) => here.has(topic.id))
+    .sort((a, b) => (here.get(a.id) ?? 0) - (here.get(b.id) ?? 0));
 
-  return fresh.sort((a, b) => {
+  const ordered = fresh.sort((a, b) => {
     const coverage = (elsewhereCount.get(b.id) ?? 0) - (elsewhereCount.get(a.id) ?? 0);
     if (coverage !== 0) return coverage;
 
@@ -119,7 +135,9 @@ export function pickReadingTopic(
     if (recency !== 0) return recency;
 
     return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
-  })[0];
+  });
+
+  return [...ordered, ...reread];
 }
 
 /** As linhas de `grammar_progress` dos textos, ja sem o prefixo do topico. */

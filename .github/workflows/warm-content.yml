@@ -1,0 +1,72 @@
+# Prepara o conteudo de estudo antes da hora do estudo.
+#
+# Existe porque a sessao NUNCA gera conteudo: quatro idiomas numa resposta so
+# levam minutos e a funcao da Vercel morre aos 60s. Quem paga esse custo e o
+# `content:warm` -- e ate aqui ele so rodava quando alguem lembrava de rodar na
+# propria maquina. O resultado foi o esperado: o aluno abriu a aula e os blocos
+# de estrutura e de contraste responderam 503 pedindo que ele rodasse um script
+# de terminal, no celular, no meio do estudo.
+#
+# O runner do GitHub nao tem o teto de 60s da Vercel, entao a geracao inteira
+# cabe aqui sem truque nenhum.
+name: warm-content
+
+on:
+  schedule:
+    # 08:00 UTC = 05:00 em Brasilia. O estudo e de manha, e ao acordar o
+    # conteudo do dia ja esta no banco. Cron do GitHub as vezes atrasa alguns
+    # minutos; nao importa, ha horas de folga.
+    - cron: '0 8 * * *'
+  # Para rodar na mao depois de mexer no catalogo, sem esperar a madrugada.
+  workflow_dispatch:
+
+# Duas execucoes ao mesmo tempo gerariam a mesma aula duas vezes -- o `warm` e
+# idempotente por contagem no banco, e contagem nao protege contra corrida.
+concurrency:
+  group: warm-content
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    # A geracao e lenta de proposito (modelo forte, cirilico, quatro idiomas).
+    # O padrao de 6h seria um cartao de credito aberto se algo travasse.
+    timeout-minutes: 45
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+      MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      AI_PROVIDER_ORDER: mimo,openrouter
+      AI_FAST_PROVIDER_ORDER: openrouter,mimo
+      MIMO_THINKING: 'off'
+      JWT_SECRET: nao-usado-neste-script
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # O client do Prisma e gerado, nao versionado.
+      - run: npx prisma generate
+        working-directory: apps/api
+
+      # `WARM_EMAIL` (Settings -> Variables -> Actions) limita a preparacao a uma
+      # conta. Sem ela o script prepara TODOS os usuarios do banco, e contas de
+      # teste custam geracao de verdade -- quatro idiomas numa resposta so, no
+      # modelo forte. Vazia, o comportamento antigo continua valendo.
+      - name: Preparar o conteudo do dia
+        run: |
+          if [ -n "${WARM_EMAIL}" ]; then
+            npm run content:warm -w @4l/api -- --email="${WARM_EMAIL}"
+          else
+            npm run content:warm -w @4l/api
+          fi
+        env:
+          WARM_EMAIL: ${{ vars.WARM_EMAIL }}
