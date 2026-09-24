@@ -82,8 +82,11 @@ export class ShadowingService {
 
     if (sentences.length === 0) {
       throw new ServiceUnavailableException(
+        // Este bloco nao tem conteudo proprio: ele repete frases que os outros
+        // blocos ja ensinaram. Pedir um comando de terminal a quem estuda pelo
+        // celular nunca ajudou ninguem -- o que destrava e uma sessao.
         `Ainda nao ha frase estudada em ${userLanguage.language.name} para repetir. ` +
-          'Rode "npm run content:warm -w @4l/api" ou faça uma sessão neste idioma primeiro.',
+          'Faça uma sessão neste idioma primeiro.',
       );
     }
 

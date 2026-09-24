@@ -88,8 +88,13 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
       body.response_format = { type: 'json_object' };
     }
 
+    /*
+     * Chamada urgente corta antes do teto da plataforma de proposito: a funcao
+     * na Vercel morre aos 60s, e morrer junto com ela entrega "network error"
+     * ao aluno. Cortando antes, quem chamou ainda tem tempo de servir o plano B.
+     */
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60_000);
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 60_000);
 
     let response: Response;
     try {
@@ -104,7 +109,11 @@ export abstract class OpenAiCompatibleProvider implements AiProvider {
         signal: controller.signal,
       });
     } catch (err) {
-      throw new AiProviderError(this.name, (err as Error).message);
+      const message =
+        (err as Error).name === 'AbortError'
+          ? `sem resposta em ${Math.round((input.timeoutMs ?? 60_000) / 1000)}s`
+          : (err as Error).message;
+      throw new AiProviderError(this.name, message);
     } finally {
       clearTimeout(timeout);
     }

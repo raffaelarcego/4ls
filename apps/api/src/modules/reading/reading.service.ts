@@ -10,6 +10,7 @@ import {
   ReadingPassageTarget,
 } from '../../infrastructure/ai/prompts';
 import { AiRouterService } from '../../infrastructure/ai/ai-router.service';
+import { URGENT_TIMEOUT_MS } from '../../infrastructure/ai/ai.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   findReadingTopic,
@@ -113,10 +114,9 @@ export class ReadingService {
   /**
    * O texto de hoje neste idioma.
    *
-   * Este caminho NUNCA gera conteudo: so le o que ja esta pronto. Sao quatro
-   * versoes de uma historia numa resposta so, com cirilico dentro -- a geracao
-   * mais cara do produto junto com a da can-do --, e a funcao na Vercel morre
-   * aos 60s. Quem gera e `warm()`, fora do horario de estudo.
+   * Pool vazio nao e erro: o texto e gerado na hora, em chamada urgente (40s
+   * medidos pelo provider de menor latencia, contra os 60s da funcao na
+   * Vercel). Ver `serve()`.
    */
   async lesson(userId: string, languageCode: string) {
     const { languages, level } = await this.learner(userId);
@@ -133,8 +133,10 @@ export class ReadingService {
 
     const rows = await this.progressRows(userId, candidates);
     const ranked = rankReadingTopics(candidates, rows, languageCode);
-    const topic = await this.firstPrepared(ranked, level);
-    const { versions, contrast } = await this.fromPool(topic, level);
+    const {
+      topic,
+      content: { versions, contrast },
+    } = await this.serve(userId, ranked, level, languages);
 
     const version = versions.find((v) => v.languageCode === languageCode);
     if (!version) {
@@ -340,15 +342,32 @@ export class ReadingService {
   }
 
   /**
-   * O primeiro texto da fila que JA ESTA preparado.
-   *
-   * Descer a fila e a diferenca entre ler uma historia menos ideal e nao ler
-   * nada. O aviso no log denuncia atraso do `warm()`: se aparece todo dia, o
-   * quebrado e o agendamento, nao o catalogo.
+   * O texto que vai para a tela, por ordem de preferencia: do pool, gerado na
+   * hora, ou -- so se a geracao falhar -- o melhor texto ja preparado. Mesmo
+   * desenho dos blocos de estrutura e de can-do.
    */
-  private async firstPrepared(ranked: ReadingTopic[], level: string): Promise<ReadingTopic> {
+  private async serve(
+    userId: string,
+    ranked: ReadingTopic[],
+    level: ReadingLevel,
+    languages: Array<{ code: string; name: string; level: string }>,
+  ) {
     if (ranked.length === 0) {
       throw new NotFoundException(`Ainda nao ha texto de leitura para o nivel ${level}.`);
+    }
+
+    const ideal = ranked[0];
+
+    const ready = await this.fromPool(ideal, level);
+    if (ready) return { topic: ideal, content: ready };
+
+    try {
+      return { topic: ideal, content: await this.generateNow(userId, ideal, level, languages) };
+    } catch (error) {
+      this.logger.warn(
+        `Geracao urgente do texto "${ideal.id}"/${level} falhou: ${(error as Error).message}. ` +
+          'Procurando um texto ja preparado.',
+      );
     }
 
     const rows = await this.prisma.readingPassage.findMany({
@@ -357,23 +376,44 @@ export class ReadingService {
       distinct: ['topicId'],
     });
     const prepared = new Set(rows.map((r) => r.topicId));
-    const topic = ranked.find((t) => prepared.has(t.id));
 
-    if (!topic) {
-      throw new ServiceUnavailableException(
-        `O texto "${ranked[0].title}" nos quatro idiomas ainda não foi preparado. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-lo.',
-      );
+    for (const topic of ranked.slice(1)) {
+      if (!prepared.has(topic.id)) continue;
+      const content = await this.fromPool(topic, level);
+      if (content) return { topic, content };
     }
 
-    if (topic.id !== ranked[0].id) {
-      this.logger.warn(
-        `Texto ideal "${ranked[0].id}" sem versao pronta em ${level}; servindo "${topic.id}". ` +
-          'O warm-content esta atrasado.',
-      );
-    }
+    throw new ServiceUnavailableException(
+      `Nao consegui montar o texto "${ideal.title}" nos quatro idiomas agora. ` +
+        'Tente de novo em um minuto.',
+    );
+  }
 
-    return topic;
+  /** Gera o texto na hora e guarda no pool -- o aluno paga a espera uma vez. */
+  private async generateNow(
+    userId: string,
+    topic: ReadingTopic,
+    level: ReadingLevel,
+    languages: Array<{ code: string; name: string; level: string }>,
+  ) {
+    const generated = await this.generate(userId, topic, languages, true);
+
+    const saved = await this.prisma.readingPassage.create({
+      data: {
+        topicId: topic.id,
+        level,
+        title: topic.title,
+        versions: generated.versions as unknown as object,
+        contrast: generated.contrast,
+        timesUsed: 1,
+        lastUsedAt: new Date(),
+      },
+    });
+
+    return {
+      versions: (saved.versions ?? []) as unknown as ReadingVersion[],
+      contrast: saved.contrast,
+    };
   }
 
   private async fromPool(topic: ReadingTopic, level: string) {
@@ -382,12 +422,8 @@ export class ReadingService {
       orderBy: [{ timesUsed: 'asc' }, { lastUsedAt: 'asc' }],
     });
 
-    if (!reused) {
-      throw new ServiceUnavailableException(
-        `O texto "${topic.title}" nos quatro idiomas ainda não foi preparado. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-lo.',
-      );
-    }
+    // `null` quando nao ha nenhum: quem decide o que fazer e `serve()`.
+    if (!reused) return null;
 
     await this.prisma.readingPassage
       .update({
@@ -406,6 +442,7 @@ export class ReadingService {
     userId: string,
     topic: ReadingTopic,
     languages: Array<{ code: string; name: string; level: string }>,
+    urgent = false,
   ): Promise<GeneratedPassage> {
     const targets: ReadingPassageTarget[] = languages.map((l) => ({
       code: l.code,
@@ -436,6 +473,8 @@ export class ReadingService {
        * de sintaxe, escondendo que o problema era tamanho.
        */
       maxTokens: 20000,
+      urgent,
+      timeoutMs: urgent ? URGENT_TIMEOUT_MS : undefined,
       messages: [
         { role: 'user', content: readingPassagePrompt(ctx, expected, QUESTIONS_PER_VERSION) },
       ],

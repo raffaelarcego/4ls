@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { sentencePatternPrompt, SentencePatternContext } from '../../infrastructure/ai/prompts';
 import { AiRouterService } from '../../infrastructure/ai/ai-router.service';
+import { URGENT_TIMEOUT_MS } from '../../infrastructure/ai/ai.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { ConceptsService } from '../concepts/concepts.service';
 import { ErrorsService } from '../errors/errors.service';
@@ -107,10 +108,8 @@ export class StructureService {
    * aluno. Nao e rotacao cega: se a ordem do verbo alemao ainda nao firmou,
    * ela volta -- e o ponto que trava todas as frases daquele idioma.
    *
-   * Este caminho NUNCA gera conteudo: so le o que ja esta pronto. Gerar uma
-   * aula custa cerca de dois minutos (medido: 116s em russo) e a funcao na
-   * Vercel morre aos 60s -- o aluno recebia "network error" no meio do estudo.
-   * Quem gera e `warm()`, fora do horario de estudo. Ver `warm-content.ts`.
+   * Pool vazio nao e erro: a aula e gerada na hora, como sempre foi. O que
+   * mudou foi a FILA de providers dessa geracao -- ver `serve()`.
    */
   async lesson(userId: string, languageCode: string) {
     const userLanguage = await this.prisma.userLanguage.findFirst({
@@ -129,8 +128,7 @@ export class StructureService {
     }
 
     const ranked = await this.rankPatterns(userId, languageCode, candidates);
-    const pattern = await this.firstPrepared(ranked, userLanguage.currentLevel);
-    const content = await this.fromPool(pattern, userLanguage.currentLevel);
+    const { pattern, content } = await this.serve(userId, ranked, userLanguage.currentLevel);
 
     const progress = await this.prisma.grammarProgress.findUnique({
       where: {
@@ -197,38 +195,68 @@ export class StructureService {
   }
 
   /**
-   * O primeiro padrao da fila que JA TEM aula pronta.
+   * A aula que vai para a tela, por ordem de preferencia.
    *
-   * A sessao desce a fila em vez de exigir o primeiro colocado, e essa e a
-   * diferenca entre uma aula menos ideal e bloco nenhum. O padrao ideal so fica
-   * sem conteudo quando o `warm()` esta atrasado -- e nesse dia servir o
-   * segundo da fila ensina muito mais que uma tela de erro.
-   *
-   * O aviso no log existe para o atraso nao passar despercebido: se ele aparece
-   * todo dia, quem esta quebrado e o agendamento do `warm()`, nao a aula.
+   * 1. Do pool, se o padrao do dia ja tem aula pronta -- instantaneo.
+   * 2. Gerada na hora, em chamada urgente. E o comportamento historico do
+   *    produto, e ele funcionava; o que o quebrou foi a fila padrao de
+   *    providers comecar pela MiMo, que leva 75-200s e estoura os 60s da
+   *    funcao na Vercel. Urgente vai pelo modelo forte de menor latencia
+   *    (21-29s medidos), com corte antes do teto da plataforma.
+   * 3. Se ate a geracao falhar -- provider fora do ar --, desce a fila e serve
+   *    o melhor padrao ja preparado. Uma aula menos ideal ensina mais que uma
+   *    tela de erro.
    */
-  private async firstPrepared(
-    ranked: SentencePattern[],
-    level: string,
-  ): Promise<SentencePattern> {
-    const prepared = await this.preparedIds(ranked, level);
-    const pattern = ranked.find((p) => prepared.has(p.id));
+  private async serve(userId: string, ranked: SentencePattern[], level: string) {
+    const ideal = ranked[0];
 
-    if (!pattern) {
-      throw new ServiceUnavailableException(
-        `A aula de estrutura de ${ranked[0].languageCode} ainda não foi preparada. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
-      );
-    }
+    const ready = await this.fromPool(ideal, level);
+    if (ready) return { pattern: ideal, content: ready };
 
-    if (pattern.id !== ranked[0].id) {
+    try {
+      return { pattern: ideal, content: await this.generateNow(userId, ideal, level) };
+    } catch (error) {
       this.logger.warn(
-        `Padrao ideal "${ranked[0].id}" sem aula pronta em ${level}; servindo "${pattern.id}". ` +
-          'O warm-content esta atrasado.',
+        `Geracao urgente de "${ideal.id}"/${level} falhou: ${(error as Error).message}. ` +
+          'Procurando um padrao ja preparado.',
       );
     }
 
-    return pattern;
+    const prepared = await this.preparedIds(ranked, level);
+    for (const pattern of ranked.slice(1)) {
+      if (!prepared.has(pattern.id)) continue;
+      const content = await this.fromPool(pattern, level);
+      if (content) return { pattern, content };
+    }
+
+    throw new ServiceUnavailableException(
+      `Nao consegui montar a aula de estrutura de ${ideal.languageCode} agora. Tente de novo em um minuto.`,
+    );
+  }
+
+  /** Gera a aula na hora e guarda no pool -- o aluno paga a espera uma vez. */
+  private async generateNow(userId: string, pattern: SentencePattern, level: string) {
+    const generated = await this.generate(userId, pattern, level, true);
+
+    const saved = await this.prisma.sentencePattern.create({
+      data: {
+        languageCode: pattern.languageCode,
+        level,
+        patternId: pattern.id,
+        title: generated.title,
+        question: pattern.question,
+        formula: generated.formula,
+        explanation: generated.explanation,
+        steps: generated.steps as unknown as object,
+        examples: generated.examples as unknown as object,
+        pitfalls: generated.pitfalls as unknown as object,
+        drills: generated.drills as unknown as object,
+        timesUsed: 1,
+        lastUsedAt: new Date(),
+      },
+    });
+
+    return serialize(saved);
   }
 
   /** Quais destes padroes ja tem pelo menos uma aula no pool. */
@@ -249,16 +277,15 @@ export class StructureService {
   }
 
   /**
-   * A aula pronta, do pool.
+   * A aula pronta, do pool -- ou `null` quando ainda nao ha nenhuma.
+   *
+   * Devolver `null` em vez de lancar e o que deixa `serve()` decidir o que
+   * fazer com a ausencia: gerar na hora e o caminho normal, e erro so no fim
+   * da fila de alternativas.
    *
    * Basta UMA no pool para servir; antes so reaproveitava com o pool cheio
    * (tres) e gerava nas duas primeiras vezes -- ou seja, justamente quando o
-   * aluno estava esperando. Encher o pool e trabalho do `warm()`, que roda
-   * fora do estudo.
-   *
-   * O 503 daqui e rede de seguranca contra corrida (a aula some entre a
-   * consulta e o uso); o caminho normal ja escolheu um padrao preparado em
-   * `firstPrepared`.
+   * aluno estava esperando.
    */
   private async fromPool(pattern: SentencePattern, level: string) {
     const where = { languageCode: pattern.languageCode, level, patternId: pattern.id };
@@ -268,12 +295,7 @@ export class StructureService {
       orderBy: [{ timesUsed: 'asc' }, { lastUsedAt: 'asc' }],
     });
 
-    if (!reused) {
-      throw new ServiceUnavailableException(
-        `A aula de estrutura de ${pattern.languageCode} ainda não foi preparada. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
-      );
-    }
+    if (!reused) return null;
 
     await this.prisma.sentencePattern
       .update({
@@ -364,6 +386,7 @@ export class StructureService {
     userId: string,
     pattern: SentencePattern,
     level: string,
+    urgent = false,
   ): Promise<GeneratedLesson> {
     const languageName = await this.languageName(pattern.languageCode);
 
@@ -401,6 +424,8 @@ export class StructureService {
        * o alfabeto latino: a mesma aula em russo ocupa quase o dobro.
        */
       maxTokens: 4000,
+      urgent,
+      timeoutMs: urgent ? URGENT_TIMEOUT_MS : undefined,
       messages: [{ role: 'user', content: sentencePatternPrompt(ctx, DRILLS_PER_LESSON) }],
     });
 

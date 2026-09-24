@@ -10,6 +10,7 @@ import {
   CanDoLessonTarget,
 } from '../../infrastructure/ai/prompts';
 import { AiRouterService } from '../../infrastructure/ai/ai-router.service';
+import { URGENT_TIMEOUT_MS } from '../../infrastructure/ai/ai.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CanDo, findCanDo, canDoTopicId } from './can-do.catalog';
 import {
@@ -91,11 +92,10 @@ export class CanDoService {
   /**
    * A can-do de hoje, realizada nos quatro idiomas.
    *
-   * Este caminho NUNCA gera conteudo: so le o que ja esta pronto. Gerar uma
-   * aula destas e a operacao mais cara do produto -- quatro idiomas numa
-   * resposta so, com cirilico dentro -- e a funcao na Vercel morre aos 60s. O
-   * aluno recebia "network error" no meio do estudo. Quem gera e `warm()`,
-   * fora do horario de estudo. Ver `warm-content.ts`.
+   * Pool vazio nao e erro: a aula e gerada na hora. Ela e a operacao mais cara
+   * do produto -- quatro idiomas numa resposta so, com cirilico dentro --, e e
+   * por isso que a geracao urgente vai pelo provider de menor latencia: 24-29s
+   * medidos, dentro dos 60s da funcao na Vercel. Ver `serve()`.
    */
   async today(userId: string) {
     const { languages, level } = await this.learner(userId);
@@ -107,8 +107,7 @@ export class CanDoService {
 
     const rows = await this.progressRows(userId, candidates);
     const ranked = rankCanDos(candidates, rows, languages.length);
-    const canDo = await this.firstPrepared(ranked, level);
-    const content = await this.fromPool(canDo, level);
+    const { canDo, content } = await this.serve(userId, ranked, level, languages);
 
     return {
       canDoId: canDo.id,
@@ -133,35 +132,73 @@ export class CanDoService {
   }
 
   /**
-   * A primeira can-do da fila que JA TEM aula pronta.
-   *
-   * Descer a fila e a diferenca entre praticar uma funcao comunicativa menos
-   * urgente e nao praticar nenhuma. O aviso no log e o que denuncia atraso do
-   * `warm()` -- se ele aparece todos os dias, o quebrado e o agendamento.
+   * A aula que vai para a tela, por ordem de preferencia: do pool, gerada na
+   * hora, ou -- so se a geracao falhar -- a melhor can-do ja preparada.
+   * Mesmo desenho do bloco de estrutura, e pela mesma razao.
    */
-  private async firstPrepared(ranked: CanDo[], level: string): Promise<CanDo> {
+  private async serve(
+    userId: string,
+    ranked: CanDo[],
+    level: string,
+    languages: Array<{ code: string; name: string; level: string }>,
+  ) {
     if (ranked.length === 0) {
       throw new NotFoundException(`Ainda nao ha can-do para o nivel ${level}.`);
     }
 
-    const prepared = await this.preparedIds(ranked, level);
-    const canDo = ranked.find((c) => prepared.has(c.id));
+    const ideal = ranked[0];
 
-    if (!canDo) {
-      throw new ServiceUnavailableException(
-        `A aula de "${ranked[0].question}" nos quatro idiomas ainda não foi preparada. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
-      );
-    }
+    const ready = await this.fromPool(ideal, level);
+    if (ready) return { canDo: ideal, content: ready };
 
-    if (canDo.id !== ranked[0].id) {
+    try {
+      return { canDo: ideal, content: await this.generateNow(userId, ideal, level, languages) };
+    } catch (error) {
       this.logger.warn(
-        `Can-do ideal "${ranked[0].id}" sem aula pronta em ${level}; servindo "${canDo.id}". ` +
-          'O warm-content esta atrasado.',
+        `Geracao urgente da can-do "${ideal.id}"/${level} falhou: ${(error as Error).message}. ` +
+          'Procurando uma can-do ja preparada.',
       );
     }
 
-    return canDo;
+    const prepared = await this.preparedIds(ranked, level);
+    for (const canDo of ranked.slice(1)) {
+      if (!prepared.has(canDo.id)) continue;
+      const content = await this.fromPool(canDo, level);
+      if (content) return { canDo, content };
+    }
+
+    throw new ServiceUnavailableException(
+      `Nao consegui montar a aula de "${ideal.question}" nos quatro idiomas agora. ` +
+        'Tente de novo em um minuto.',
+    );
+  }
+
+  /** Gera a aula na hora e guarda no pool -- o aluno paga a espera uma vez. */
+  private async generateNow(
+    userId: string,
+    canDo: CanDo,
+    level: string,
+    languages: Array<{ code: string; name: string; level: string }>,
+  ) {
+    const generated = await this.generate(userId, canDo, languages, true);
+
+    const saved = await this.prisma.canDoLesson.create({
+      data: {
+        canDoId: canDo.id,
+        level,
+        question: canDo.question,
+        columns: canDo.columns as unknown as object,
+        sentences: generated.sentences as unknown as object,
+        contrast: generated.contrast,
+        timesUsed: 1,
+        lastUsedAt: new Date(),
+      },
+    });
+
+    return {
+      sentences: (saved.sentences ?? []) as unknown as CanDoSentence[],
+      contrast: saved.contrast,
+    };
   }
 
   /** Quais destas can-dos ja tem pelo menos uma aula no pool. */
@@ -328,9 +365,8 @@ export class CanDoService {
   /**
    * A aula pronta, do pool.
    *
-   * Basta UMA para servir, e quem escolheu ja garantiu que ela existe: o 503
-   * daqui e so rede de seguranca contra corrida. Encher o pool e trabalho do
-   * `warm()`.
+   * Basta UMA para servir. `null` quando nao ha nenhuma -- quem decide o que
+   * fazer com a ausencia e `serve()`.
    */
   private async fromPool(canDo: CanDo, level: string) {
     const reused = await this.prisma.canDoLesson.findFirst({
@@ -338,12 +374,7 @@ export class CanDoService {
       orderBy: [{ timesUsed: 'asc' }, { lastUsedAt: 'asc' }],
     });
 
-    if (!reused) {
-      throw new ServiceUnavailableException(
-        `A aula de "${canDo.question}" nos quatro idiomas ainda não foi preparada. ` +
-          'Rode "npm run content:warm -w @4l/api" para gerá-la.',
-      );
-    }
+    if (!reused) return null;
 
     await this.prisma.canDoLesson
       .update({
@@ -362,6 +393,7 @@ export class CanDoService {
     userId: string,
     canDo: CanDo,
     languages: Array<{ code: string; name: string; level: string }>,
+    urgent = false,
   ): Promise<GeneratedCanDoLesson> {
     const targets: CanDoLessonTarget[] = languages.map((l) => {
       const note = canDo.notes.find((n) => n.languageCode === l.code);
@@ -394,6 +426,8 @@ export class CanDoService {
        * sintaxe, escondendo que o problema era tamanho.
        */
       maxTokens: 12000,
+      urgent,
+      timeoutMs: urgent ? URGENT_TIMEOUT_MS : undefined,
       messages: [{ role: 'user', content: canDoLessonPrompt(ctx, SENTENCES_PER_LESSON) }],
     });
 

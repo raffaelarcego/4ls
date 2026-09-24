@@ -15,6 +15,7 @@ export class AiRouterService {
   private readonly logger = new Logger(AiRouterService.name);
   private readonly strongChain: AiProvider[];
   private readonly fastChain: AiProvider[];
+  private readonly urgentChain: AiProvider[];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -37,11 +38,27 @@ export class AiRouterService {
     this.fastChain = resolve(
       this.config.get<string>('AI_FAST_PROVIDER_ORDER', 'openrouter,mimo'),
     );
+
+    /*
+     * A fila de quem tem alguem esperando na tela.
+     *
+     * Mesmos modelos fortes da `strongChain`, outra ordem: o de menor latencia
+     * primeiro. Nos logs, `structure.generate` sai em 21-29s pelo OpenRouter e
+     * em 75-200s pela MiMo -- e a funcao na Vercel morre aos 60s. Comecar pela
+     * MiMo numa chamada urgente e garantir o estouro.
+     */
+    this.urgentChain = resolve(
+      this.config.get<string>('AI_URGENT_PROVIDER_ORDER', 'openrouter,mimo'),
+    );
   }
 
   /** Cadeia de providers configurados para a classe da tarefa. */
-  private chainFor(task: AiTask): AiProvider[] {
-    const chain = COMPLEX_TASKS.has(task) ? this.strongChain : this.fastChain;
+  private chainFor(task: AiTask, urgent = false): AiProvider[] {
+    const chain = urgent
+      ? this.urgentChain
+      : COMPLEX_TASKS.has(task)
+        ? this.strongChain
+        : this.fastChain;
     const available = chain.filter((p) => p.isConfigured());
     // Se a cadeia preferida nao tem ninguem configurado, cai na outra.
     if (available.length > 0) return available;
@@ -61,7 +78,7 @@ export class AiRouterService {
   }
 
   async chat(input: AiChatInput): Promise<AiChatResponse> {
-    const providers = this.chainFor(input.task);
+    const providers = this.chainFor(input.task, input.urgent);
 
     if (providers.length === 0) {
       throw new ServiceUnavailableException(
@@ -87,7 +104,7 @@ export class AiRouterService {
    */
   async chatJson<T>(input: AiChatInput): Promise<T> {
     const json = { ...input, json: true };
-    const providers = this.chainFor(json.task);
+    const providers = this.chainFor(json.task, json.urgent);
 
     if (providers.length === 0) {
       throw new ServiceUnavailableException(

@@ -102,11 +102,35 @@ export interface AiMessage {
   images?: AiImage[];
 }
 
+/**
+ * Teto de uma chamada com o aluno esperando.
+ *
+ * A funcao na Vercel morre aos 60s. Medido no pior caso real -- aula de
+ * estrutura em russo, que rende menos caractere por token --, a geracao urgente
+ * leva ~38s; o resto do caminho (consultas e gravacao) fica em segundos. Os 50s
+ * deixam folga para o plano B ainda responder dentro do limite da plataforma,
+ * em vez de a funcao inteira morrer e o aluno ver "network error".
+ */
+export const URGENT_TIMEOUT_MS = 50_000;
+
 export interface AiChatInput {
   task: AiTask;
   messages: AiMessage[];
   /** Forca resposta em JSON valido. */
   json?: boolean;
+  /**
+   * O aluno esta esperando esta resposta na tela.
+   *
+   * Muda a ORDEM dos providers, nao a qualidade: o modelo forte de menor
+   * latencia vem primeiro. A diferenca e brutal e esta medida nos logs -- a
+   * mesma aula de estrutura sai em 21-29s pelo OpenRouter e em 75-200s pela
+   * MiMo. Foi essa fila (MiMo primeiro) que estourou os 60s da funcao na
+   * Vercel e fez a geracao ser tirada da sessao; o problema nunca foi gerar
+   * durante o estudo.
+   */
+  urgent?: boolean;
+  /** Corta a chamada antes do teto da plataforma, para sobrar tempo ao plano B. */
+  timeoutMs?: number;
   temperature?: number;
   maxTokens?: number;
   /** Metadados apenas para observabilidade. */

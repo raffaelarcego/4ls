@@ -9,6 +9,7 @@ import {
   MorphologyParadigmContext,
 } from '../../infrastructure/ai/prompts';
 import { AiRouterService } from '../../infrastructure/ai/ai-router.service';
+import { URGENT_TIMEOUT_MS } from '../../infrastructure/ai/ai.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
   allSlotsFor,
@@ -98,8 +99,8 @@ export class MorphologyService {
   /**
    * A aula de casos de hoje, num idioma.
    *
-   * So le conteudo pronto, como os outros blocos: quem gera e `warm()`, fora do
-   * horario de estudo.
+   * Pool vazio nao e erro, como nos outros blocos: declina uma palavra na hora
+   * (chamada urgente) e segue. `warm()` so adianta o trabalho.
    */
   async lesson(userId: string, languageCode: string) {
     const userLanguage = await this.prisma.userLanguage.findFirst({
@@ -121,7 +122,27 @@ export class MorphologyService {
     const rows = await this.progressRows(userId, languageCode, level);
     const slot = pickSlot(candidates, rows)!;
 
-    const paradigms = await this.fromPool(languageCode, slot, candidates);
+    let paradigms = await this.fromPool(languageCode, slot, candidates);
+
+    if (paradigms.length === 0) {
+      /*
+       * Nenhuma palavra declinada ainda neste idioma: declina UMA agora, com a
+       * fila urgente de providers. Uma so, porque o aluno esta esperando -- o
+       * resto do pool fica para o `warm()`.
+       */
+      await this.warm(userId, languageCode, 1, true).catch((error) =>
+        this.logger.warn(`Declinacao urgente em ${languageCode} falhou: ${(error as Error).message}`),
+      );
+      paradigms = await this.fromPool(languageCode, slot, candidates);
+    }
+
+    if (paradigms.length === 0) {
+      throw new ServiceUnavailableException(
+        `Nao consegui montar a tabela de casos de ${userLanguage.language.name} agora. ` +
+          'Tente de novo em um minuto.',
+      );
+    }
+
     const [main, ...extras] = paradigms;
 
     return {
@@ -162,7 +183,12 @@ export class MorphologyService {
    * Roda fora do horario de estudo. Gera so o que falta ate o pool encher, e
    * pula as palavras que ja tem tabela -- idempotente e de graca quando cheio.
    */
-  async warm(userId: string, languageCode: string, target = POOL_TARGET): Promise<number> {
+  async warm(
+    userId: string,
+    languageCode: string,
+    target = POOL_TARGET,
+    urgent = false,
+  ): Promise<number> {
     if (!hasMorphology(languageCode)) return 0;
 
     const userLanguage = await this.prisma.userLanguage.findFirst({
@@ -212,7 +238,14 @@ export class MorphologyService {
       if (existing.length + created >= target) break;
 
       try {
-        const generated = await this.generate(userId, languageCode, level, candidate, slots);
+        const generated = await this.generate(
+          userId,
+          languageCode,
+          level,
+          candidate,
+          slots,
+          urgent,
+        );
         await this.prisma.morphologyParadigm.create({
           data: {
             languageCode,
@@ -335,12 +368,9 @@ export class MorphologyService {
 
     const usable = pool.filter((p) => usableStored(p, candidates));
 
-    if (usable.length === 0) {
-      throw new ServiceUnavailableException(
-        `Nenhuma palavra de ${languageCode} foi declinada ainda. ` +
-          'Rode "npm run content:warm -w @4l/api" para preparar as tabelas.',
-      );
-    }
+    // Vazio nao lanca: quem decide o que fazer com a ausencia e `lesson()`,
+    // que declina uma palavra na hora antes de desistir.
+    if (usable.length === 0) return [];
 
     const main = usable[0];
     const extras = usable
@@ -373,6 +403,7 @@ export class MorphologyService {
     level: string,
     word: { term: string; meaning: string },
     slots: MorphologySlot[],
+    urgent = false,
   ): Promise<GeneratedParadigm> {
     const ctx: MorphologyParadigmContext = {
       languageCode,
@@ -397,6 +428,8 @@ export class MorphologyService {
       // rende menos caractere por token. Teto curto trunca o JSON e o erro
       // resultante fala de sintaxe, escondendo que o problema era tamanho.
       maxTokens: 8000,
+      urgent,
+      timeoutMs: urgent ? URGENT_TIMEOUT_MS : undefined,
       messages: [{ role: 'user', content: morphologyParadigmPrompt(ctx) }],
     });
 
